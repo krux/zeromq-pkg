@@ -2,7 +2,7 @@ Source: zeromq
 Section: libs
 Priority: optional
 Maintainer: Martin Lucina <mato@kotelna.sk>
-Build-Depends: debhelper (>= 7), uuid-dev, libpgm-dev, pkg-config
+Build-Depends: debhelper (>= 7), uuid-dev, pkg-config
 Standards-Version: 3.9.2
 Homepage: http://www.zeromq.org/
 

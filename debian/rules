@@ -14,7 +14,6 @@ configure-stamp:
 
 	./configure $(CROSS) \
 	    --prefix=/usr \
-	    --with-system-pgm \
 	    CFLAGS="$(CFLAGS)" \
 	    LDFLAGS="-Wl,--as-needed -Wl,-z,defs" \
 
