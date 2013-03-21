@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -19,8 +18,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "epoll.hpp"
-#if defined ZMQ_USE_EPOLL
+#include "platform.hpp"
+
+#ifdef ZMQ_HAVE_LINUX
 
 #include <sys/epoll.h>
 #include <stdlib.h>
@@ -140,10 +140,9 @@ void zmq::epoll_t::loop ()
         //  Wait for events.
         int n = epoll_wait (epoll_fd, &ev_buf [0], max_io_events,
             timeout ? timeout : -1);
-        if (n == -1) {
-            errno_assert (errno == EINTR);
+        if (n == -1 && errno == EINTR)
             continue;
-        }
+        errno_assert (n != -1);
 
         for (int i = 0; i < n; i ++) {
             poll_entry_t *pe = ((poll_entry_t*) ev_buf [i].data.ptr);

@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: zmq_setsockopt
 .\"    Author: [see the "AUTHORS" section]
-.\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 11/23/2012
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
+.\"      Date: 05/07/2011
 .\"    Manual: 0MQ Manual
-.\"    Source: 0MQ 3.2.2
+.\"    Source: 0MQ 2.1.6
 .\"  Language: English
 .\"
-.TH "ZMQ_SETSOCKOPT" "3" "11/23/2012" "0MQ 3\&.2\&.2" "0MQ Manual"
+.TH "ZMQ_SETSOCKOPT" "3" "05/07/2011" "0MQ 2\&.1\&.6" "0MQ Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -33,33 +33,19 @@ zmq_setsockopt \- set 0MQ socket options
 .sp
 \fBint zmq_setsockopt (void \fR\fB\fI*socket\fR\fR\fB, int \fR\fB\fIoption_name\fR\fR\fB, const void \fR\fB\fI*option_value\fR\fR\fB, size_t \fR\fB\fIoption_len\fR\fR\fB);\fR
 .sp
-Caution: All options, with the exception of ZMQ_SUBSCRIBE, ZMQ_UNSUBSCRIBE, ZMQ_LINGER, ZMQ_ROUTER_MANDATORY and ZMQ_XPUB_VERBOSE only take effect for subsequent socket bind/connects\&.
+Caution: All options, with the exception of ZMQ_SUBSCRIBE, ZMQ_UNSUBSCRIBE and ZMQ_LINGER, only take effect for subsequent socket bind/connects\&.
 .SH "DESCRIPTION"
 .sp
 The \fIzmq_setsockopt()\fR function shall set the option specified by the \fIoption_name\fR argument to the value pointed to by the \fIoption_value\fR argument for the 0MQ socket pointed to by the \fIsocket\fR argument\&. The \fIoption_len\fR argument is the size of the option value in bytes\&.
 .sp
 The following socket options can be set with the \fIzmq_setsockopt()\fR function:
-.SS "ZMQ_SNDHWM: Set high water mark for outbound messages"
+.SS "ZMQ_HWM: Set high water mark"
 .sp
-The \fIZMQ_SNDHWM\fR option shall set the high water mark for outbound messages on the specified \fIsocket\fR\&. The high water mark is a hard limit on the maximum number of outstanding messages 0MQ shall queue in memory for any single peer that the specified \fIsocket\fR is communicating with\&.
+The \fIZMQ_HWM\fR option shall set the high water mark for the specified \fIsocket\fR\&. The high water mark is a hard limit on the maximum number of outstanding messages 0MQ shall queue in memory for any single peer that the specified \fIsocket\fR is communicating with\&.
 .sp
 If this limit has been reached the socket shall enter an exceptional state and depending on the socket type, 0MQ shall take appropriate action such as blocking or dropping sent messages\&. Refer to the individual socket descriptions in \fBzmq_socket\fR(3) for details on the exact action taken for each socket type\&.
-.if n \{\
 .sp
-.\}
-.RS 4
-.it 1 an-trap
-.nr an-no-space-flag 1
-.nr an-break-flag 1
-.br
-.ps +1
-\fBNote\fR
-.ps -1
-.br
-.sp
-0MQ does not guarantee that the socket will accept as many as ZMQ_SNDHWM messages, and the actual limit may be as much as 60\-70% lower depending on the flow of messages on the socket\&.
-.sp .5v
-.RE
+The default \fIZMQ_HWM\fR value of zero means "no limit"\&.
 .TS
 tab(:);
 lt lt
@@ -71,7 +57,7 @@ T{
 Option value type
 T}:T{
 .sp
-int
+uint64_t
 T}
 T{
 .sp
@@ -85,7 +71,7 @@ T{
 Default value
 T}:T{
 .sp
-1000
+0
 T}
 T{
 .sp
@@ -96,11 +82,11 @@ all
 T}
 .TE
 .sp 1
-.SS "ZMQ_RCVHWM: Set high water mark for inbound messages"
+.SS "ZMQ_SWAP: Set disk offload size"
 .sp
-The \fIZMQ_RCVHWM\fR option shall set the high water mark for inbound messages on the specified \fIsocket\fR\&. The high water mark is a hard limit on the maximum number of outstanding messages 0MQ shall queue in memory for any single peer that the specified \fIsocket\fR is communicating with\&.
+The \fIZMQ_SWAP\fR option shall set the disk offload (swap) size for the specified \fIsocket\fR\&. A socket which has \fIZMQ_SWAP\fR set to a non\-zero value may exceed it\(cqs high water mark; in this case outstanding messages shall be offloaded to storage on disk rather than held in memory\&.
 .sp
-If this limit has been reached the socket shall enter an exceptional state and depending on the socket type, 0MQ shall take appropriate action such as blocking or dropping sent messages\&. Refer to the individual socket descriptions in \fBzmq_socket\fR(3) for details on the exact action taken for each socket type\&.
+The value of \fIZMQ_SWAP\fR defines the maximum size of the swap space in bytes\&.
 .TS
 tab(:);
 lt lt
@@ -112,21 +98,21 @@ T{
 Option value type
 T}:T{
 .sp
-int
+int64_t
 T}
 T{
 .sp
 Option value unit
 T}:T{
 .sp
-messages
+bytes
 T}
 T{
 .sp
 Default value
 T}:T{
 .sp
-1000
+0
 T}
 T{
 .sp
@@ -177,6 +163,49 @@ Applicable socket types
 T}:T{
 .sp
 N/A
+T}
+.TE
+.sp 1
+.SS "ZMQ_IDENTITY: Set socket identity"
+.sp
+The \fIZMQ_IDENTITY\fR option shall set the identity of the specified \fIsocket\fR\&. Socket identity determines if existing 0MQ infrastructure (\fImessage queues\fR, \fIforwarding devices\fR) shall be identified with a specific application and persist across multiple runs of the application\&.
+.sp
+If the socket has no identity, each run of an application is completely separate from other runs\&. However, with identity set the socket shall re\-use any existing 0MQ infrastructure configured by the previous run(s)\&. Thus the application may receive messages that were sent in the meantime, \fImessage queue\fR limits shall be shared with previous run(s) and so on\&.
+.sp
+Identity should be at least one byte and at most 255 bytes long\&. Identities starting with binary zero are reserved for use by 0MQ infrastructure\&.
+.TS
+tab(:);
+lt lt
+lt lt
+lt lt
+lt lt.
+T{
+.sp
+Option value type
+T}:T{
+.sp
+binary data
+T}
+T{
+.sp
+Option value unit
+T}:T{
+.sp
+N/A
+T}
+T{
+.sp
+Default value
+T}:T{
+.sp
+NULL
+T}
+T{
+.sp
+Applicable socket types
+T}:T{
+.sp
+all
 T}
 .TE
 .sp 1
@@ -260,49 +289,6 @@ ZMQ_SUB
 T}
 .TE
 .sp 1
-.SS "ZMQ_IDENTITY: Set socket identity"
-.sp
-The \fIZMQ_IDENTITY\fR option shall set the identity of the specified \fIsocket\fR\&. Socket identity is used only by request/reply pattern\&. Namely, it can be used in tandem with ROUTER socket to route messages to the peer with specific identity\&.
-.sp
-Identity should be at least one byte and at most 255 bytes long\&. Identities starting with binary zero are reserved for use by 0MQ infrastructure\&.
-.sp
-If two peers use the same identity when connecting to a third peer, the results shall be undefined\&.
-.TS
-tab(:);
-lt lt
-lt lt
-lt lt
-lt lt.
-T{
-.sp
-Option value type
-T}:T{
-.sp
-binary data
-T}
-T{
-.sp
-Option value unit
-T}:T{
-.sp
-N/A
-T}
-T{
-.sp
-Default value
-T}:T{
-.sp
-NULL
-T}
-T{
-.sp
-Applicable socket types
-T}:T{
-.sp
-all
-T}
-.TE
-.sp 1
 .SS "ZMQ_RATE: Set multicast data rate"
 .sp
 The \fIZMQ_RATE\fR option shall set the maximum send or receive data rate for multicast transports such as \fBzmq_pgm\fR(7) using the specified \fIsocket\fR\&.
@@ -317,7 +303,7 @@ T{
 Option value type
 T}:T{
 .sp
-int
+int64_t
 T}
 T{
 .sp
@@ -344,7 +330,7 @@ T}
 .sp 1
 .SS "ZMQ_RECOVERY_IVL: Set multicast recovery interval"
 .sp
-The \fIZMQ_RECOVERY_IVL\fR option shall set the recovery interval for multicast transports using the specified \fIsocket\fR\&. The recovery interval determines the maximum time in milliseconds that a receiver can be absent from a multicast group before unrecoverable data loss will occur\&.
+The \fIZMQ_RECOVERY_IVL\fR option shall set the recovery interval for multicast transports using the specified \fIsocket\fR\&. The recovery interval determines the maximum time in seconds that a receiver can be absent from a multicast group before unrecoverable data loss will occur\&.
 .if n \{\
 .sp
 .\}
@@ -372,7 +358,64 @@ T{
 Option value type
 T}:T{
 .sp
-int
+int64_t
+T}
+T{
+.sp
+Option value unit
+T}:T{
+.sp
+seconds
+T}
+T{
+.sp
+Default value
+T}:T{
+.sp
+10
+T}
+T{
+.sp
+Applicable socket types
+T}:T{
+.sp
+all, when using multicast transports
+T}
+.TE
+.sp 1
+.SS "ZMQ_RECOVERY_IVL_MSEC: Set multicast recovery interval in milliseconds"
+.sp
+The \fIZMQ_RECOVERY_IVL_MSEC\fR option shall set the recovery interval, specified in milliseconds (ms) for multicast transports using the specified \fIsocket\fR\&. The recovery interval determines the maximum time in milliseconds that a receiver can be absent from a multicast group before unrecoverable data loss will occur\&.
+.sp
+A non\-zero value of the \fIZMQ_RECOVERY_IVL_MSEC\fR option will take precedence over the \fIZMQ_RECOVERY_IVL\fR option, but since the default for the \fIZMQ_RECOVERY_IVL_MSEC\fR is \-1, the default is to use the \fIZMQ_RECOVERY_IVL\fR option value\&.
+.if n \{\
+.sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBCaution\fR
+.ps -1
+.br
+.sp
+Exercise care when setting large recovery intervals as the data needed for recovery will be held in memory\&. For example, a 1 minute recovery interval at a data rate of 1Gbps requires a 7GB in\-memory buffer\&.
+.sp .5v
+.RE
+.TS
+tab(:);
+lt lt
+lt lt
+lt lt
+lt lt.
+T{
+.sp
+Option value type
+T}:T{
+.sp
+int64_t
 T}
 T{
 .sp
@@ -386,7 +429,46 @@ T{
 Default value
 T}:T{
 .sp
-10000
+\-1
+T}
+T{
+.sp
+Applicable socket types
+T}:T{
+.sp
+all, when using multicast transports
+T}
+.TE
+.sp 1
+.SS "ZMQ_MCAST_LOOP: Control multicast loop\-back"
+.sp
+The \fIZMQ_MCAST_LOOP\fR option shall control whether data sent via multicast transports using the specified \fIsocket\fR can also be received by the sending host via loop\-back\&. A value of zero disables the loop\-back functionality, while the default value of 1 enables the loop\-back functionality\&. Leaving multicast loop\-back enabled when it is not required can have a negative impact on performance\&. Where possible, disable \fIZMQ_MCAST_LOOP\fR in production environments\&.
+.TS
+tab(:);
+lt lt
+lt lt
+lt lt
+lt lt.
+T{
+.sp
+Option value type
+T}:T{
+.sp
+int64_t
+T}
+T{
+.sp
+Option value unit
+T}:T{
+.sp
+boolean
+T}
+T{
+.sp
+Default value
+T}:T{
+.sp
+1
 T}
 T{
 .sp
@@ -411,7 +493,7 @@ T{
 Option value type
 T}:T{
 .sp
-int
+uint64_t
 T}
 T{
 .sp
@@ -450,7 +532,7 @@ T{
 Option value type
 T}:T{
 .sp
-int
+uint64_t
 T}
 T{
 .sp
@@ -552,7 +634,7 @@ T}
 .RE
 .SS "ZMQ_RECONNECT_IVL: Set reconnection interval"
 .sp
-The \fIZMQ_RECONNECT_IVL\fR option shall set the initial reconnection interval for the specified \fIsocket\fR\&. The reconnection interval is the period 0MQ shall wait between attempts to reconnect disconnected peers when using connection\-oriented transports\&. The value \-1 means no reconnection\&.
+The \fIZMQ_RECONNECT_IVL\fR option shall set the initial reconnection interval for the specified \fIsocket\fR\&. The reconnection interval is the period 0MQ shall wait between attempts to reconnect disconnected peers when using connection\-oriented transports\&.
 .if n \{\
 .sp
 .\}
@@ -696,513 +778,6 @@ Applicable socket types
 T}:T{
 .sp
 all, only for connection\-oriented transports\&.
-T}
-.TE
-.sp 1
-.SS "ZMQ_MAXMSGSIZE: Maximum acceptable inbound message size"
-.sp
-Limits the size of the inbound message\&. If a peer sends a message larger than ZMQ_MAXMSGSIZE it is disconnected\&. Value of \-1 means \fIno limit\fR\&.
-.TS
-tab(:);
-lt lt
-lt lt
-lt lt
-lt lt.
-T{
-.sp
-Option value type
-T}:T{
-.sp
-int64_t
-T}
-T{
-.sp
-Option value unit
-T}:T{
-.sp
-bytes
-T}
-T{
-.sp
-Default value
-T}:T{
-.sp
-\-1
-T}
-T{
-.sp
-Applicable socket types
-T}:T{
-.sp
-all
-T}
-.TE
-.sp 1
-.SS "ZMQ_MULTICAST_HOPS: Maximum network hops for multicast packets"
-.sp
-Sets the time\-to\-live field in every multicast packet sent from this socket\&. The default is 1 which means that the multicast packets don\(cqt leave the local network\&.
-.TS
-tab(:);
-lt lt
-lt lt
-lt lt
-lt lt.
-T{
-.sp
-Option value type
-T}:T{
-.sp
-int
-T}
-T{
-.sp
-Option value unit
-T}:T{
-.sp
-network hops
-T}
-T{
-.sp
-Default value
-T}:T{
-.sp
-1
-T}
-T{
-.sp
-Applicable socket types
-T}:T{
-.sp
-all, when using multicast transports
-T}
-.TE
-.sp 1
-.SS "ZMQ_RCVTIMEO: Maximum time before a recv operation returns with EAGAIN"
-.sp
-Sets the timeout for receive operation on the socket\&. If the value is 0, \fIzmq_recv(3)\fR will return immediately, with a EAGAIN error if there is no message to receive\&. If the value is \-1, it will block until a message is available\&. For all other values, it will wait for a message for that amount of time before returning with an EAGAIN error\&.
-.TS
-tab(:);
-lt lt
-lt lt
-lt lt
-lt lt.
-T{
-.sp
-Option value type
-T}:T{
-.sp
-int
-T}
-T{
-.sp
-Option value unit
-T}:T{
-.sp
-milliseconds
-T}
-T{
-.sp
-Default value
-T}:T{
-.sp
-\-1 (infinite)
-T}
-T{
-.sp
-Applicable socket types
-T}:T{
-.sp
-all
-T}
-.TE
-.sp 1
-.SS "ZMQ_SNDTIMEO: Maximum time before a send operation returns with EAGAIN"
-.sp
-Sets the timeout for send operation on the socket\&. If the value is 0, \fIzmq_send(3)\fR will return immediately, with a EAGAIN error if the message cannot be sent\&. If the value is \-1, it will block until the message is sent\&. For all other values, it will try to send the message for that amount of time before returning with an EAGAIN error\&.
-.TS
-tab(:);
-lt lt
-lt lt
-lt lt
-lt lt.
-T{
-.sp
-Option value type
-T}:T{
-.sp
-int
-T}
-T{
-.sp
-Option value unit
-T}:T{
-.sp
-milliseconds
-T}
-T{
-.sp
-Default value
-T}:T{
-.sp
-\-1 (infinite)
-T}
-T{
-.sp
-Applicable socket types
-T}:T{
-.sp
-all
-T}
-.TE
-.sp 1
-.SS "ZMQ_IPV4ONLY: Use IPv4\-only sockets"
-.sp
-Sets the underlying native socket type\&. A value of 1 will use IPv4 sockets, while the value of 0 will use IPv6 sockets\&. An IPv6 socket lets applications connect to and accept connections from both IPv4 and IPv6 hosts\&.
-.TS
-tab(:);
-lt lt
-lt lt
-lt lt
-lt lt.
-T{
-.sp
-Option value type
-T}:T{
-.sp
-int
-T}
-T{
-.sp
-Option value unit
-T}:T{
-.sp
-boolean
-T}
-T{
-.sp
-Default value
-T}:T{
-.sp
-1 (true)
-T}
-T{
-.sp
-Applicable socket types
-T}:T{
-.sp
-all, when using TCP transports\&.
-T}
-.TE
-.sp 1
-.SS "ZMQ_DELAY_ATTACH_ON_CONNECT: Accept messages only when connections are made"
-.sp
-If set to 1, will delay the attachment of a pipe on connect until the underlying connection has completed\&. This will cause the socket to block if there are no other connections, but will prevent queues from filling on pipes awaiting connection\&.
-.TS
-tab(:);
-lt lt
-lt lt
-lt lt
-lt lt.
-T{
-.sp
-Option value type
-T}:T{
-.sp
-int
-T}
-T{
-.sp
-Option value unit
-T}:T{
-.sp
-boolean
-T}
-T{
-.sp
-Default value
-T}:T{
-.sp
-0 (false)
-T}
-T{
-.sp
-Applicable socket types
-T}:T{
-.sp
-all, only for connection\-oriented transports\&.
-T}
-.TE
-.sp 1
-.SS "ZMQ_ROUTER_MANDATORY: accept only routable messages on ROUTER sockets"
-.sp
-Sets the \fIROUTER\fR socket behavior when an unroutable message is encountered\&. A value of 0 is the default and discards the message silently when it cannot be routed\&. A value of 1 returns an \fIEHOSTUNREACH\fR error code if the message cannot be routed\&.
-.TS
-tab(:);
-lt lt
-lt lt
-lt lt
-lt lt.
-T{
-.sp
-Option value type
-T}:T{
-.sp
-int
-T}
-T{
-.sp
-Option value unit
-T}:T{
-.sp
-0, 1
-T}
-T{
-.sp
-Default value
-T}:T{
-.sp
-0
-T}
-T{
-.sp
-Applicable socket types
-T}:T{
-.sp
-ZMQ_ROUTER
-T}
-.TE
-.sp 1
-.SS "ZMQ_XPUB_VERBOSE: provide all subscription messages on XPUB sockets"
-.sp
-Sets the \fIXPUB\fR socket behavior on new subscriptions and unsubscriptions\&. A value of \fI0\fR is the default and passes only new subscription messages to upstream\&. A value of \fI1\fR passes all subscription messages upstream\&.
-.TS
-tab(:);
-lt lt
-lt lt
-lt lt
-lt lt.
-T{
-.sp
-Option value type
-T}:T{
-.sp
-int
-T}
-T{
-.sp
-Option value unit
-T}:T{
-.sp
-0, 1
-T}
-T{
-.sp
-Default value
-T}:T{
-.sp
-0
-T}
-T{
-.sp
-Applicable socket types
-T}:T{
-.sp
-ZMQ_XPUB
-T}
-.TE
-.sp 1
-.SS "ZMQ_TCP_KEEPALIVE: Override SO_KEEPALIVE socket option"
-.sp
-Override \fISO_KEEPALIVE\fR socket option(where supported by OS)\&. The default value of \-1 means to skip any overrides and leave it to OS default\&.
-.TS
-tab(:);
-lt lt
-lt lt
-lt lt
-lt lt.
-T{
-.sp
-Option value type
-T}:T{
-.sp
-int
-T}
-T{
-.sp
-Option value unit
-T}:T{
-.sp
-\-1,0,1
-T}
-T{
-.sp
-Default value
-T}:T{
-.sp
-\-1 (leave to OS default)
-T}
-T{
-.sp
-Applicable socket types
-T}:T{
-.sp
-all, when using TCP transports\&.
-T}
-.TE
-.sp 1
-.SS "ZMQ_TCP_KEEPALIVE_IDLE: Override TCP_KEEPCNT(or TCP_KEEPALIVE on some OS)"
-.sp
-Override \fITCP_KEEPCNT\fR(or \fITCP_KEEPALIVE\fR on some OS) socket option(where supported by OS)\&. The default value of \-1 means to skip any overrides and leave it to OS default\&.
-.TS
-tab(:);
-lt lt
-lt lt
-lt lt
-lt lt.
-T{
-.sp
-Option value type
-T}:T{
-.sp
-int
-T}
-T{
-.sp
-Option value unit
-T}:T{
-.sp
-\-1,>0
-T}
-T{
-.sp
-Default value
-T}:T{
-.sp
-\-1 (leave to OS default)
-T}
-T{
-.sp
-Applicable socket types
-T}:T{
-.sp
-all, when using TCP transports\&.
-T}
-.TE
-.sp 1
-.SS "ZMQ_TCP_KEEPALIVE_CNT: Override TCP_KEEPCNT socket option"
-.sp
-Override \fITCP_KEEPCNT\fR socket option(where supported by OS)\&. The default value of \-1 means to skip any overrides and leave it to OS default\&.
-.TS
-tab(:);
-lt lt
-lt lt
-lt lt
-lt lt.
-T{
-.sp
-Option value type
-T}:T{
-.sp
-int
-T}
-T{
-.sp
-Option value unit
-T}:T{
-.sp
-\-1,>0
-T}
-T{
-.sp
-Default value
-T}:T{
-.sp
-\-1 (leave to OS default)
-T}
-T{
-.sp
-Applicable socket types
-T}:T{
-.sp
-all, when using TCP transports\&.
-T}
-.TE
-.sp 1
-.SS "ZMQ_TCP_KEEPALIVE_INTVL: Override TCP_KEEPINTVL socket option"
-.sp
-Override \fITCP_KEEPINTVL\fR socket option(where supported by OS)\&. The default value of \-1 means to skip any overrides and leave it to OS default\&.
-.TS
-tab(:);
-lt lt
-lt lt
-lt lt
-lt lt.
-T{
-.sp
-Option value type
-T}:T{
-.sp
-int
-T}
-T{
-.sp
-Option value unit
-T}:T{
-.sp
-\-1,>0
-T}
-T{
-.sp
-Default value
-T}:T{
-.sp
-\-1 (leave to OS default)
-T}
-T{
-.sp
-Applicable socket types
-T}:T{
-.sp
-all, when using TCP transports\&.
-T}
-.TE
-.sp 1
-.SS "ZMQ_TCP_ACCEPT_FILTER: Assign filters to allow new TCP connections"
-.sp
-Assign arbitrary number of filters that will be applied for each new TCP transport connection on a listening socket\&. If no filters applied, then TCP transport allows connections from any ip\&. If at least one filter is applied then new connection source ip should be matched\&. To clear all filters call zmq_setsockopt(socket, ZMQ_TCP_ACCEPT_FILTER, NULL, 0)\&. Filter is a null\-terminated string with ipv6 or ipv4 CIDR\&.
-.TS
-tab(:);
-lt lt
-lt lt
-lt lt
-lt lt.
-T{
-.sp
-Option value type
-T}:T{
-.sp
-binary data
-T}
-T{
-.sp
-Option value unit
-T}:T{
-.sp
-N/A
-T}
-T{
-.sp
-Default value
-T}:T{
-.sp
-no filters (allow from all)
-T}
-T{
-.sp
-Applicable socket types
-T}:T{
-.sp
-all listening sockets, when using TCP transports\&.
 T}
 .TE
 .sp 1

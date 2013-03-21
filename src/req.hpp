@@ -1,7 +1,5 @@
 /*
-    Copyright (c) 2007-2012 iMatix Corporation
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2011 VMware, Inc.
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -23,27 +21,21 @@
 #ifndef __ZMQ_REQ_HPP_INCLUDED__
 #define __ZMQ_REQ_HPP_INCLUDED__
 
-#include "dealer.hpp"
-#include "stdint.hpp"
+#include "xreq.hpp"
 
 namespace zmq
 {
 
-    class ctx_t;
-    class msg_t;
-    class io_thread_t;
-    class socket_base_t;
-
-    class req_t : public dealer_t
+    class req_t : public xreq_t
     {
     public:
 
-        req_t (zmq::ctx_t *parent_, uint32_t tid_, int sid_);
+        req_t (class ctx_t *parent_, uint32_t tid_);
         ~req_t ();
 
         //  Overloads of functions from socket_base_t.
-        int xsend (zmq::msg_t *msg_, int flags_);
-        int xrecv (zmq::msg_t *msg_, int flags_);
+        int xsend (zmq_msg_t *msg_, int flags_);
+        int xrecv (zmq_msg_t *msg_, int flags_);
         bool xhas_in ();
         bool xhas_out ();
 
@@ -59,31 +51,6 @@ namespace zmq
 
         req_t (const req_t&);
         const req_t &operator = (const req_t&);
-    };
-
-    class req_session_t : public dealer_session_t
-    {
-    public:
-
-        req_session_t (zmq::io_thread_t *io_thread_, bool connect_,
-            zmq::socket_base_t *socket_, const options_t &options_,
-            const address_t *addr_);
-        ~req_session_t ();
-
-        //  Overloads of the functions from session_base_t.
-        int push_msg (msg_t *msg_);
-        void reset ();
-
-    private:
-
-        enum {
-            identity,
-            bottom,
-            body
-        } state;
-
-        req_session_t (const req_session_t&);
-        const req_session_t &operator = (const req_session_t&);
     };
 
 }

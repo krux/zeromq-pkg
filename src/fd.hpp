@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -35,7 +35,7 @@ namespace zmq
     enum {retired_fd = (fd_t)(~0)};
 #else
     typedef SOCKET fd_t;
-    enum {retired_fd = (fd_t)INVALID_SOCKET};
+    enum {retired_fd = INVALID_SOCKET};
 #endif
 #else
     typedef int fd_t;

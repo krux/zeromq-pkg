@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -19,88 +18,139 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "../include/zmq.h"
+
 #include "pair.hpp"
 #include "err.hpp"
 #include "pipe.hpp"
-#include "msg.hpp"
 
-zmq::pair_t::pair_t (class ctx_t *parent_, uint32_t tid_, int sid_) :
-    socket_base_t (parent_, tid_, sid_),
-    pipe (NULL)
+zmq::pair_t::pair_t (class ctx_t *parent_, uint32_t tid_) :
+    socket_base_t (parent_, tid_),
+    inpipe (NULL),
+    outpipe (NULL),
+    inpipe_alive (false),
+    outpipe_alive (false),
+    terminating (false)
 {
     options.type = ZMQ_PAIR;
+    options.requires_in = true;
+    options.requires_out = true;
 }
 
 zmq::pair_t::~pair_t ()
 {
-    zmq_assert (!pipe);
+    zmq_assert (!inpipe);
+    zmq_assert (!outpipe);
 }
 
-void zmq::pair_t::xattach_pipe (pipe_t *pipe_, bool icanhasall_)
+void zmq::pair_t::xattach_pipes (reader_t *inpipe_, writer_t *outpipe_,
+    const blob_t &peer_identity_)
 {
-    // icanhasall_ is unused
-    (void)icanhasall_;
+    zmq_assert (!inpipe && !outpipe);
 
-    zmq_assert (pipe_ != NULL);
+    inpipe = inpipe_;
+    inpipe_alive = true;
+    inpipe->set_event_sink (this);
 
-    //  ZMQ_PAIR socket can only be connected to a single peer.
-    //  The socket rejects any further connection requests.
-    if (pipe == NULL)
-        pipe = pipe_;
-    else
-        pipe_->terminate (false);
+    outpipe = outpipe_;
+    outpipe_alive = true;
+    outpipe->set_event_sink (this);
+
+    if (terminating) {
+        register_term_acks (2);
+        inpipe_->terminate ();
+        outpipe_->terminate ();
+    }
 }
 
-void zmq::pair_t::xterminated (pipe_t *pipe_)
+void zmq::pair_t::terminated (reader_t *pipe_)
 {
-    if (pipe_ == pipe)
-        pipe = NULL;
+    zmq_assert (pipe_ == inpipe);
+    inpipe = NULL;
+    inpipe_alive = false;
+
+    if (terminating)
+        unregister_term_ack ();
 }
 
-void zmq::pair_t::xread_activated (pipe_t *)
+void zmq::pair_t::terminated (writer_t *pipe_)
 {
-    //  There's just one pipe. No lists of active and inactive pipes.
-    //  There's nothing to do here.
+    zmq_assert (pipe_ == outpipe);
+    outpipe = NULL;
+    outpipe_alive = false;
+
+    if (terminating)
+        unregister_term_ack ();
 }
 
-void zmq::pair_t::xwrite_activated (pipe_t *)
+void  zmq::pair_t::delimited (reader_t *pipe_)
 {
-    //  There's just one pipe. No lists of active and inactive pipes.
-    //  There's nothing to do here.
 }
 
-int zmq::pair_t::xsend (msg_t *msg_, int flags_)
+void zmq::pair_t::process_term (int linger_)
 {
-    if (!pipe || !pipe->write (msg_)) {
+    terminating = true;
+
+    if (inpipe) {
+        register_term_acks (1);
+        inpipe->terminate ();
+    }
+
+    if (outpipe) {
+        register_term_acks (1);
+        outpipe->terminate ();
+    }
+
+    socket_base_t::process_term (linger_);
+}
+
+void zmq::pair_t::activated (class reader_t *pipe_)
+{
+    zmq_assert (!inpipe_alive);
+    inpipe_alive = true;
+}
+
+void zmq::pair_t::activated (class writer_t *pipe_)
+{
+    zmq_assert (!outpipe_alive);
+    outpipe_alive = true;
+}
+
+int zmq::pair_t::xsend (zmq_msg_t *msg_, int flags_)
+{
+    if (outpipe == NULL || !outpipe_alive) {
+        errno = EAGAIN;
+        return -1;
+    }
+
+    if (!outpipe->write (msg_)) {
+        outpipe_alive = false;
         errno = EAGAIN;
         return -1;
     }
 
     if (!(flags_ & ZMQ_SNDMORE))
-        pipe->flush ();
+        outpipe->flush ();
 
     //  Detach the original message from the data buffer.
-    int rc = msg_->init ();
-    errno_assert (rc == 0);
+    int rc = zmq_msg_init (msg_);
+    zmq_assert (rc == 0);
 
     return 0;
 }
 
-int zmq::pair_t::xrecv (msg_t *msg_, int flags_)
+int zmq::pair_t::xrecv (zmq_msg_t *msg_, int flags_)
 {
-    // flags_ is unused
-    (void)flags_;
-
     //  Deallocate old content of the message.
-    int rc = msg_->close ();
-    errno_assert (rc == 0);
+    zmq_msg_close (msg_);
 
-    if (!pipe || !pipe->read (msg_)) {
+    if (!inpipe_alive || !inpipe || !inpipe->read (msg_)) {
+
+        //  No message is available.
+        inpipe_alive = false;
 
         //  Initialise the output parameter to be a 0-byte message.
-        rc = msg_->init ();
-        errno_assert (rc == 0);
-
+        zmq_msg_init (msg_);
         errno = EAGAIN;
         return -1;
     }
@@ -109,28 +159,22 @@ int zmq::pair_t::xrecv (msg_t *msg_, int flags_)
 
 bool zmq::pair_t::xhas_in ()
 {
-    if (!pipe)
+    if (!inpipe || !inpipe_alive)
         return false;
 
-    return pipe->check_read ();
+    inpipe_alive = inpipe->check_read ();
+    return inpipe_alive;
 }
 
 bool zmq::pair_t::xhas_out ()
 {
-    if (!pipe)
+    if (!outpipe || !outpipe_alive)
         return false;
 
-    return pipe->check_write ();
-}
-
-zmq::pair_session_t::pair_session_t (io_thread_t *io_thread_, bool connect_,
-      socket_base_t *socket_, const options_t &options_,
-      const address_t *addr_) :
-    session_base_t (io_thread_, connect_, socket_, options_, addr_)
-{
-}
-
-zmq::pair_session_t::~pair_session_t ()
-{
+    zmq_msg_t msg;
+    zmq_msg_init (&msg);
+    outpipe_alive = outpipe->check_write (&msg);
+    zmq_msg_close (&msg);
+    return outpipe_alive;
 }
 

@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2010-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -22,20 +21,48 @@
 #ifndef __ZMQ_IP_HPP_INCLUDED__
 #define __ZMQ_IP_HPP_INCLUDED__
 
-#include "fd.hpp"
+#include "platform.hpp"
+
+#ifdef ZMQ_HAVE_WINDOWS
+#include "windows.hpp"
+#else
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#endif
+
+#if !defined ZMQ_HAVE_WINDOWS && !defined ZMQ_HAVE_OPENVMS
+#include <sys/un.h>
+#endif
+
+//  Some platforms (notably Darwin/OSX and NetBSD) do not define all AI_
+//  flags for getaddrinfo(). This can be worked around safely by defining
+//  these to 0.
+#ifndef AI_ADDRCONFIG
+#define AI_ADDRCONFIG 0
+#endif
+#ifndef AI_NUMERICSERV
+#define AI_NUMERICSERV 0
+#endif
 
 namespace zmq
 {
 
-    //  Same as socket(2), but allows for transparent tweaking the options.
-    fd_t open_socket (int domain_, int type_, int protocol_);
+    //  Resolves network interface name in <nic-name>:<port> format. Symbol "*"
+    //  (asterisk) resolves to INADDR_ANY (all network interfaces).
+    int resolve_ip_interface (sockaddr_storage *addr_, socklen_t *addr_len_,
+        char const *interface_);
 
-    //  Sets the socket into non-blocking mode.
-    void unblock_socket (fd_t s_);
+    //  This function resolves a string in <hostname>:<port-number> format.
+    //  Hostname can be either the name of the host or its IP address.
+    int resolve_ip_hostname (sockaddr_storage *addr_, socklen_t *addr_len_,
+        const char *hostname_);
 
-    //  Enable IPv4-mapping of addresses in case it is disabled by default.
-    void enable_ipv4_mapping (fd_t s_);
-
+    // This function sets up address for UNIX domain transport.
+    int resolve_local_path (sockaddr_storage *addr_, socklen_t *addr_len_,
+        const char* pathname_);
 }
 
 #endif 

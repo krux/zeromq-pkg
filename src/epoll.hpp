@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -22,9 +21,9 @@
 #ifndef __ZMQ_EPOLL_HPP_INCLUDED__
 #define __ZMQ_EPOLL_HPP_INCLUDED__
 
-//  poller.hpp decides which polling mechanism to use.
-#include "poller.hpp"
-#if defined ZMQ_USE_EPOLL
+#include "platform.hpp"
+
+#ifdef ZMQ_HAVE_LINUX
 
 #include <vector>
 #include <sys/epoll.h>
@@ -35,8 +34,6 @@
 
 namespace zmq
 {
-
-    struct i_poll_events;
 
     //  This class implements socket polling mechanism using the Linux-specific
     //  epoll mechanism.
@@ -51,7 +48,7 @@ namespace zmq
         ~epoll_t ();
 
         //  "poller" concept.
-        handle_t add_fd (fd_t fd_, zmq::i_poll_events *events_);
+        handle_t add_fd (fd_t fd_, struct i_poll_events *events_);
         void rm_fd (handle_t handle_);
         void set_pollin (handle_t handle_);
         void reset_pollin (handle_t handle_);
@@ -75,7 +72,7 @@ namespace zmq
         {
             fd_t fd;
             epoll_event ev;
-            zmq::i_poll_events *events;
+            struct i_poll_events *events;
         };
 
         //  List of retired event sources.
@@ -91,8 +88,6 @@ namespace zmq
         epoll_t (const epoll_t&);
         const epoll_t &operator = (const epoll_t&);
     };
-
-    typedef epoll_t poller_t;
 
 }
 

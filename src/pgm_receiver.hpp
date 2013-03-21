@@ -1,7 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
-    Copyright (c) 2010-2011 Miru Limited
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -43,22 +41,19 @@
 namespace zmq
 {
 
-    class io_thread_t;
-    class session_base_t;
-
     class pgm_receiver_t : public io_object_t, public i_engine
     {
     
     public:
 
-        pgm_receiver_t (zmq::io_thread_t *parent_, const options_t &options_);
+        pgm_receiver_t (class io_thread_t *parent_, const options_t &options_);
         ~pgm_receiver_t ();
 
         int init (bool udp_encapsulation_, const char *network_);
 
         //  i_engine interface implementation.
-        void plug (zmq::io_thread_t *io_thread_,
-            zmq::session_base_t *session_);
+        void plug (class io_thread_t *io_thread_, struct i_inout *inout_);
+        void unplug ();
         void terminate ();
         void activate_in ();
         void activate_out ();
@@ -68,13 +63,6 @@ namespace zmq
         void timer_event (int token);
 
     private:
-
-        //  Unplug the engine from the session.
-        void unplug ();
-
-        //  PGM is not able to move subscriptions upstream. Thus, drop all
-        //  the pending subscriptions.
-        void drop_subscriptions ();
 
         //  RX timeout timer ID.
         enum {rx_timer_id = 0xa1};
@@ -112,8 +100,8 @@ namespace zmq
         //  Socket options.
         options_t options;
 
-        //  Associated session.
-        zmq::session_base_t *session;
+        //  Parent session.
+        i_inout *inout;
 
         //  Most recently used decoder.
         decoder_t *mru_decoder;

@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2007-2012 iMatix Corporation
-    Copyright (c) 2009-2011 250bpm s.r.o.
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -53,9 +52,15 @@ int main (int argc, char *argv [])
         return -1;
     }
 
-    s = zmq_socket (ctx, ZMQ_PULL);
+    s = zmq_socket (ctx, ZMQ_SUB);
     if (!s) {
         printf ("error in zmq_socket: %s\n", zmq_strerror (errno));
+        return -1;
+    }
+
+    rc = zmq_setsockopt (s, ZMQ_SUBSCRIBE , "", 0);
+    if (rc != 0) {
+        printf ("error in zmq_setsockopt: %s\n", zmq_strerror (errno));
         return -1;
     }
 
@@ -74,9 +79,9 @@ int main (int argc, char *argv [])
         return -1;
     }
 
-    rc = zmq_recvmsg (s, &msg, 0);
-    if (rc < 0) {
-        printf ("error in zmq_recvmsg: %s\n", zmq_strerror (errno));
+    rc = zmq_recv (s, &msg, 0);
+    if (rc != 0) {
+        printf ("error in zmq_recv: %s\n", zmq_strerror (errno));
         return -1;
     }
     if (zmq_msg_size (&msg) != message_size) {
@@ -87,9 +92,9 @@ int main (int argc, char *argv [])
     watch = zmq_stopwatch_start ();
 
     for (i = 0; i != message_count - 1; i++) {
-        rc = zmq_recvmsg (s, &msg, 0);
-        if (rc < 0) {
-            printf ("error in zmq_recvmsg: %s\n", zmq_strerror (errno));
+        rc = zmq_recv (s, &msg, 0);
+        if (rc != 0) {
+            printf ("error in zmq_recv: %s\n", zmq_strerror (errno));
             return -1;
         }
         if (zmq_msg_size (&msg) != message_size) {

@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2010 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -19,41 +18,39 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "push.hpp"
-#include "pipe.hpp"
-#include "err.hpp"
-#include "msg.hpp"
+#include "../include/zmq.h"
 
-zmq::push_t::push_t (class ctx_t *parent_, uint32_t tid_, int sid_) :
-    socket_base_t (parent_, tid_, sid_)
+#include "push.hpp"
+#include "err.hpp"
+#include "pipe.hpp"
+
+zmq::push_t::push_t (class ctx_t *parent_, uint32_t tid_) :
+    socket_base_t (parent_, tid_),
+    lb (this)
 {
     options.type = ZMQ_PUSH;
+    options.requires_in = false;
+    options.requires_out = true;
 }
 
 zmq::push_t::~push_t ()
 {
 }
 
-void zmq::push_t::xattach_pipe (pipe_t *pipe_, bool icanhasall_)
+void zmq::push_t::xattach_pipes (class reader_t *inpipe_,
+    class writer_t *outpipe_, const blob_t &peer_identity_)
 {
-    // icanhasall_ is unused
-    (void)icanhasall_;
-
-    zmq_assert (pipe_);
-    lb.attach (pipe_);
+    zmq_assert (!inpipe_ && outpipe_);
+    lb.attach (outpipe_);
 }
 
-void zmq::push_t::xwrite_activated (pipe_t *pipe_)
+void zmq::push_t::process_term (int linger_)
 {
-    lb.activated (pipe_);
+    lb.terminate ();
+    socket_base_t::process_term (linger_);
 }
 
-void zmq::push_t::xterminated (pipe_t *pipe_)
-{
-    lb.terminated (pipe_);
-}
-
-int zmq::push_t::xsend (msg_t *msg_, int flags_)
+int zmq::push_t::xsend (zmq_msg_t *msg_, int flags_)
 {
     return lb.send (msg_, flags_);
 }
@@ -61,16 +58,5 @@ int zmq::push_t::xsend (msg_t *msg_, int flags_)
 bool zmq::push_t::xhas_out ()
 {
     return lb.has_out ();
-}
-
-zmq::push_session_t::push_session_t (io_thread_t *io_thread_, bool connect_,
-      socket_base_t *socket_, const options_t &options_,
-      const address_t *addr_) :
-    session_base_t (io_thread_, connect_, socket_, options_, addr_)
-{
-}
-
-zmq::push_session_t::~push_session_t ()
-{
 }
 

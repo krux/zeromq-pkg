@@ -1,6 +1,6 @@
 /*
-    Copyright (c) 2011 250bpm s.r.o.
-    Copyright (c) 2011 Other contributors as noted in the AUTHORS file
+    Copyright (c) 2007-2011 iMatix Corporation
+    Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
 
@@ -29,57 +29,36 @@
 namespace zmq
 {
 
-    class pipe_t;
-    class msg_t;
-
     //  Class manages a set of outbound pipes. It sends each messages to
     //  each of them.
-    class dist_t
+    class dist_t : public i_writer_events
     {
     public:
 
-        dist_t ();
+        dist_t (class own_t *sink_);
         ~dist_t ();
 
-        //  Adds the pipe to the distributor object.
-        void attach (zmq::pipe_t *pipe_);
-
-        //  Activates pipe that have previously reached high watermark.
-        void activated (zmq::pipe_t *pipe_);
-
-        //  Mark the pipe as matching. Subsequent call to send_to_matching
-        //  will send message also to this pipe.
-        void match (zmq::pipe_t *pipe_);
-
-        //  Mark all pipes as non-matching.
-        void unmatch ();
-
-        //  Removes the pipe from the distributor object.
-        void terminated (zmq::pipe_t *pipe_);
-
-        //  Send the message to the matching outbound pipes.
-        int send_to_matching (zmq::msg_t *msg_, int flags_);
-
-        //  Send the message to all the outbound pipes.
-        int send_to_all (zmq::msg_t *msg_, int flags_);
-
+        void attach (writer_t *pipe_);
+        void terminate ();
+        int send (zmq_msg_t *msg_, int flags_);
         bool has_out ();
+
+        //  i_writer_events interface implementation.
+        void activated (writer_t *pipe_);
+        void terminated (writer_t *pipe_);
 
     private:
 
         //  Write the message to the pipe. Make the pipe inactive if writing
         //  fails. In such a case false is returned.
-        bool write (zmq::pipe_t *pipe_, zmq::msg_t *msg_);
+        bool write (class writer_t *pipe_, zmq_msg_t *msg_);
 
         //  Put the message to all active pipes.
-        void distribute (zmq::msg_t *msg_, int flags_);
+        void distribute (zmq_msg_t *msg_, int flags_);
 
         //  List of outbound pipes.
-        typedef array_t <zmq::pipe_t, 2> pipes_t;
+        typedef array_t <class writer_t> pipes_t;
         pipes_t pipes;
-
-        //  Number of all the pipes to send the next message to.
-        pipes_t::size_type matching;
 
         //  Number of active pipes. All the active pipes are located at the
         //  beginning of the pipes array. These are the pipes the messages
@@ -95,6 +74,12 @@ namespace zmq
 
         //  True if last we are in the middle of a multipart message.
         bool more;
+
+        //  Object to send events to.
+        class own_t *sink;
+
+        //  If true, termination process is already underway.
+        bool terminating;
 
         dist_t (const dist_t&);
         const dist_t &operator = (const dist_t&);

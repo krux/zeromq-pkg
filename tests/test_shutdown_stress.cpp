@@ -1,7 +1,6 @@
 /*
-    Copyright (c) 2010-2011 250bpm s.r.o.
-    Copyright (c) 2011 iMatix Corporation
-    Copyright (c) 2010-2011 Other contributors as noted in the AUTHORS file
+    Copyright (c) 2007-2011 iMatix Corporation
+    Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
 
@@ -20,14 +19,11 @@
 */
 
 #include "../include/zmq.h"
+#include <assert.h>
 #include <pthread.h>
 #include <stddef.h>
-#include <stdio.h>
 
-#undef NDEBUG
-#include <assert.h>
-
-#define THREAD_COUNT 100
+#define THREAD_COUNT 10
 
 extern "C"
 {
@@ -46,7 +42,7 @@ extern "C"
     }
 }
 
-int main (void)
+int main (int argc, char *argv [])
 {
     void *ctx;
     void *s1;
@@ -56,15 +52,13 @@ int main (void)
     int rc;
     pthread_t threads [THREAD_COUNT];
 
-    fprintf (stderr, "test_shutdown_stress running...\n");
-
     for (j = 0; j != 10; j++) {
 
         //  Check the shutdown with many parallel I/O threads.
         ctx = zmq_init (7);
         assert (ctx);
 
-        s1 = zmq_socket (ctx, ZMQ_PUB);
+        s1 = zmq_socket (ctx, ZMQ_REP);
         assert (s1);
 
         rc = zmq_bind (s1, "tcp://127.0.0.1:5560");

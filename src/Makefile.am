@@ -3,10 +3,9 @@ lib_LTLIBRARIES = libzmq.la
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libzmq.pc
 
-include_HEADERS = ../include/zmq.h ../include/zmq_utils.h
+include_HEADERS = ../include/zmq.h ../include/zmq.hpp ../include/zmq_utils.h
 
 libzmq_la_SOURCES = \
-    address.hpp \
     array.hpp \
     atomic_counter.hpp \
     atomic_ptr.hpp \
@@ -14,8 +13,10 @@ libzmq_la_SOURCES = \
     clock.hpp \
     command.hpp \
     config.hpp \
+    connect_session.hpp \
     ctx.hpp \
     decoder.hpp \
+    device.hpp \
     devpoll.hpp \
     dist.hpp \
     encoder.hpp \
@@ -23,27 +24,19 @@ libzmq_la_SOURCES = \
     err.hpp \
     fd.hpp \
     fq.hpp \
-    i_encoder.hpp \
-    i_decoder.hpp \
-    i_engine.hpp \
-    i_msg_sink.hpp \
-    i_msg_source.hpp \
-    i_poll_events.hpp \
+    i_inout.hpp \
     io_object.hpp \
     io_thread.hpp \
     ip.hpp \
-    ipc_address.hpp \
-    ipc_connecter.hpp \
-    ipc_listener.hpp \
     i_engine.hpp \
     i_poll_events.hpp \
     kqueue.hpp \
     lb.hpp \
     likely.hpp \
     mailbox.hpp \
-    msg.hpp \
-    mtrie.hpp \
+    msg_content.hpp \
     mutex.hpp \
+    named_session.hpp \
     object.hpp \
     options.hpp \
     own.hpp \
@@ -56,39 +49,44 @@ libzmq_la_SOURCES = \
     poller.hpp \
     poller_base.hpp \
     pair.hpp \
-    proxy.hpp \
     pub.hpp \
     pull.hpp \
     push.hpp \
-    random.hpp \
     reaper.hpp \
     rep.hpp \
     req.hpp \
     select.hpp \
-    session_base.hpp \
-    signaler.hpp \
+    semaphore.hpp \
+    session.hpp \
     socket_base.hpp \
     stdint.hpp \
-    stream_engine.hpp \
     sub.hpp \
-    tcp.hpp \
-    tcp_address.hpp \
+    swap.hpp \
     tcp_connecter.hpp \
     tcp_listener.hpp \
+    tcp_socket.hpp \
     thread.hpp \
+    transient_session.hpp \
     trie.hpp \
+    uuid.hpp \
     windows.hpp \
     wire.hpp \
     xpub.hpp \
-    router.hpp \
-    dealer.hpp \
+    xrep.hpp \
+    xreq.hpp \
     xsub.hpp \
     ypipe.hpp \
     yqueue.hpp \
-    address.cpp \
+    zmq_connecter.hpp \
+    zmq_engine.hpp \
+    zmq_init.hpp \
+    zmq_listener.hpp \
     clock.cpp \
+    command.cpp \
     ctx.cpp \
+    connect_session.cpp \
     decoder.cpp \
+    device.cpp \
     devpoll.cpp \
     dist.cpp \
     encoder.cpp \
@@ -98,14 +96,10 @@ libzmq_la_SOURCES = \
     io_object.cpp \
     io_thread.cpp \
     ip.cpp \
-    ipc_address.cpp \
-    ipc_connecter.cpp \
-    ipc_listener.cpp \
     kqueue.cpp \
     lb.cpp \
     mailbox.cpp \
-    msg.cpp \
-    mtrie.cpp \
+    named_session.cpp \
     object.cpp \
     options.cpp \
     own.cpp \
@@ -118,44 +112,36 @@ libzmq_la_SOURCES = \
     poller_base.cpp \
     pull.cpp \
     push.cpp \
-    proxy.cpp \
     reaper.cpp \
     pub.cpp \
-    random.cpp \
     rep.cpp \
     req.cpp \
     select.cpp \
-    session_base.cpp \
-    signaler.cpp \
+    session.cpp \
     socket_base.cpp \
-    stream_engine.cpp \
     sub.cpp \
-    tcp.cpp \
-    tcp_address.cpp \
+    swap.cpp \
     tcp_connecter.cpp \
     tcp_listener.cpp \
+    tcp_socket.cpp \
     thread.cpp \
+    transient_session.cpp \
     trie.cpp \
+    uuid.cpp \
     xpub.cpp \
-    router.cpp \
-    dealer.cpp \
-    v1_decoder.cpp \
-    v1_decoder.hpp \
-    v1_encoder.cpp \
-    v1_encoder.hpp \
-    v1_protocol.hpp \
+    xrep.cpp \
+    xreq.cpp \
     xsub.cpp \
     zmq.cpp \
-    zmq_utils.cpp
+    zmq_connecter.cpp \
+    zmq_engine.cpp \
+    zmq_init.cpp \
+    zmq_listener.cpp
 
 if ON_MINGW
 libzmq_la_LDFLAGS = -no-undefined -avoid-version -version-info @LTVER@ @LIBZMQ_EXTRA_LDFLAGS@
 else
-if ON_ANDROID
-libzmq_la_LDFLAGS = -avoid-version -version-info @LTVER@ @LIBZMQ_EXTRA_LDFLAGS@
-else
 libzmq_la_LDFLAGS = -version-info @LTVER@ @LIBZMQ_EXTRA_LDFLAGS@
-endif
 endif
 
 libzmq_la_CXXFLAGS = @LIBZMQ_EXTRA_CXXFLAGS@
@@ -167,5 +153,3 @@ endif
 
 dist-hook:
 		-rm $(distdir)/platform.hpp
-
-

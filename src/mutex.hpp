@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2010-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -74,43 +73,47 @@ namespace zmq
 
 namespace zmq
 {
-
+ 
     class mutex_t
     {
     public:
         inline mutex_t ()
         {
             int rc = pthread_mutex_init (&mutex, NULL);
-            posix_assert (rc);
+            if (rc)
+                posix_assert (rc);
         }
-
+ 
         inline ~mutex_t ()
         {
             int rc = pthread_mutex_destroy (&mutex);
-            posix_assert (rc);
+            if (rc)
+                posix_assert (rc);
         }
-
+ 
         inline void lock ()
         {
             int rc = pthread_mutex_lock (&mutex);
-            posix_assert (rc);
+            if (rc)
+                posix_assert (rc);
         }
-
+ 
         inline void unlock ()
         {
             int rc = pthread_mutex_unlock (&mutex);
-            posix_assert (rc);
+            if (rc)
+                posix_assert (rc);
         }
-
+ 
     private:
-
+ 
         pthread_mutex_t mutex;
-
+ 
         // Disable copy construction and assignment.
         mutex_t (const mutex_t&);
         const mutex_t &operator = (const mutex_t&);
     };
-
+ 
 }
 
 #endif

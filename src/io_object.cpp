@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -102,7 +101,7 @@ void zmq::io_object_t::out_event ()
     zmq_assert (false);
 }
 
-void zmq::io_object_t::timer_event (int)
+void zmq::io_object_t::timer_event (int id_)
 {
     zmq_assert (false);
 }

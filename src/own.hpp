@@ -1,6 +1,6 @@
 /*
-    Copyright (c) 2010-2011 250bpm s.r.o.
-    Copyright (c) 2010-2011 Other contributors as noted in the AUTHORS file
+    Copyright (c) 2007-2011 iMatix Corporation
+    Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
 
@@ -32,9 +32,6 @@
 namespace zmq
 {
 
-    class ctx_t;
-    class io_thread_t;
-
     //  Base class for objects forming a part of ownership hierarchy.
     //  It handles initialisation and destruction of such objects.
 
@@ -47,10 +44,10 @@ namespace zmq
 
         //  The object is not living within an I/O thread. It has it's own
         //  thread outside of 0MQ infrastructure.
-        own_t (zmq::ctx_t *parent_, uint32_t tid_);
+        own_t (class ctx_t *parent_, uint32_t tid_);
 
         //  The object is living within I/O thread.
-        own_t (zmq::io_thread_t *io_thread_, const options_t &options_);
+        own_t (class io_thread_t *io_thread_, const options_t &options_);
 
         //  When another owned object wants to send command to this object
         //  it calls this function to let it know it should not shut down
@@ -70,16 +67,14 @@ namespace zmq
         //  Launch the supplied object and become its owner.
         void launch_child (own_t *object_);
 
-        //  Terminate owned object
-        void term_child (own_t *object_);
+        //  Launch the supplied object and make it your sibling (make your
+        //  owner become its owner as well).
+        void launch_sibling (own_t *object_);
 
         //  Ask owner object to terminate this object. It may take a while
         //  while actual termination is started. This function should not be
         //  called more than once.
         void terminate ();
-
-        //  Returns true if the object is in process of termination.
-        bool is_terminating ();
 
         //  Derived object destroys own_t. There's no point in allowing
         //  others to invoke the destructor. At the same time, it has to be

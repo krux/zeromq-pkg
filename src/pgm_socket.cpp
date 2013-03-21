@@ -1,7 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
-    Copyright (c) 2010-2011 Miru Limited
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -40,7 +38,7 @@
 #include "pgm_socket.hpp"
 #include "config.hpp"
 #include "err.hpp"
-#include "random.hpp"
+#include "uuid.hpp"
 #include "stdint.hpp"
 
 #ifndef MSG_ERRQUEUE
@@ -59,14 +57,16 @@ zmq::pgm_socket_t::pgm_socket_t (bool receiver_, const options_t &options_) :
 {
 }
 
-//  Resolve PGM socket address.
+//  Create, bind and connect PGM socket.
 //  network_ of the form <interface & multicast group decls>:<IP port>
 //  e.g. eth0;239.192.0.1:7500
 //       link-local;224.250.0.1,224.250.0.2;224.250.0.3:8000
 //       ;[fe80::1%en0]:7500
-int zmq::pgm_socket_t::init_address (const char *network_,
-    struct pgm_addrinfo_t **res, uint16_t *port_number)
+int zmq::pgm_socket_t::init (bool udp_encapsulation_, const char *network_)
 {
+    //  Can not open transport before destroying old one. 
+    zmq_assert (sock == NULL);
+ 
     //  Parse port number, start from end for IPv6
     const char *port_delim = strrchr (network_, ':');
     if (!port_delim) {
@@ -74,7 +74,7 @@ int zmq::pgm_socket_t::init_address (const char *network_,
         return -1;
     }
 
-    *port_number = atoi (port_delim + 1);
+    uint16_t port_number = atoi (port_delim + 1);
   
     char network [256];
     if (port_delim - network_ >= (int) sizeof (network) - 1) {
@@ -83,54 +83,45 @@ int zmq::pgm_socket_t::init_address (const char *network_,
     }
     memset (network, '\0', sizeof (network));
     memcpy (network, network_, port_delim - network_);
-
-    pgm_error_t *pgm_error = NULL;
-    struct pgm_addrinfo_t hints;
-
-    memset (&hints, 0, sizeof (hints));
-    hints.ai_family = AF_UNSPEC;
-    if (!pgm_getaddrinfo (network, NULL, res, &pgm_error)) {
-
-        //  Invalid parameters don't set pgm_error_t.
-        zmq_assert (pgm_error != NULL);
-        if (pgm_error->domain == PGM_ERROR_DOMAIN_IF &&
-
-              //  NB: cannot catch EAI_BADFLAGS.
-            ( pgm_error->code != PGM_ERROR_SERVICE &&
-              pgm_error->code != PGM_ERROR_SOCKTNOSUPPORT)) {
-
-            //  User, host, or network configuration or transient error.
-            pgm_error_free (pgm_error);
-            errno = EINVAL;
-            return -1;
-        }
-
-        //  Fatal OpenPGM internal error.
-        zmq_assert (false);
+   
+    //  Validate socket options 
+    //  Data rate is in [B/s]. options.rate is in [kb/s].
+    if (options.rate <= 0) {
+        errno = EINVAL;
+        return -1;
     }
-    return 0;
-}
-
-//  Create, bind and connect PGM socket.
-int zmq::pgm_socket_t::init (bool udp_encapsulation_, const char *network_)
-{
-    //  Can not open transport before destroying old one.
-    zmq_assert (sock == NULL);
-    zmq_assert (options.rate > 0);
+    //  Recovery interval [s] or [ms] - based on the user's call 
+    if ((options.recovery_ivl <= 0) && (options.recovery_ivl_msec <= 0)) {
+        errno = EINVAL;
+        return -1;
+    }
 
     //  Zero counter used in msgrecv.
     nbytes_rec = 0;
     nbytes_processed = 0;
     pgm_msgv_processed = 0;
 
-    uint16_t port_number;
-    struct pgm_addrinfo_t *res = NULL;
+    pgm_error_t *pgm_error = NULL;
+    struct pgm_addrinfo_t hints, *res = NULL;
     sa_family_t sa_family;
 
-    pgm_error_t *pgm_error = NULL;
+    memset (&hints, 0, sizeof (hints));
+    hints.ai_family = AF_UNSPEC;
+    if (!pgm_getaddrinfo (network, NULL, &res, &pgm_error)) {
 
-    if (init_address(network_, &res, &port_number) < 0) {
-        goto err_abort;
+        //  Invalid parameters don't set pgm_error_t.
+        zmq_assert (pgm_error != NULL);
+        if (pgm_error->domain == PGM_ERROR_DOMAIN_IF && (
+
+              //  NB: cannot catch EAI_BADFLAGS.
+              pgm_error->code != PGM_ERROR_SERVICE &&
+              pgm_error->code != PGM_ERROR_SOCKTNOSUPPORT))
+
+            //  User, host, or network configuration or transient error.
+            goto err_abort;
+
+        //  Fatal OpenPGM internal error.
+        zmq_assert (false);
     }
 
     zmq_assert (res != NULL);
@@ -188,24 +179,24 @@ int zmq::pgm_socket_t::init (bool udp_encapsulation_, const char *network_)
     }
 
     {
-		const int rcvbuf = (int) options.rcvbuf;
-		if (rcvbuf) {
-		    if (!pgm_setsockopt (sock, SOL_SOCKET, SO_RCVBUF, &rcvbuf,
-		          sizeof (rcvbuf)))
-		        goto err_abort;
-		}
+        const int rcvbuf = (int) options.rcvbuf,
+                  sndbuf = (int) options.sndbuf,
+                  max_tpdu = (int) pgm_max_tpdu;
+        if (rcvbuf) {
+            if (!pgm_setsockopt (sock, SOL_SOCKET, SO_RCVBUF, &rcvbuf,
+                  sizeof (rcvbuf)))
+                goto err_abort;
+        }
+        if (sndbuf) {
+            if (!pgm_setsockopt (sock, SOL_SOCKET, SO_SNDBUF, &sndbuf,
+                  sizeof (sndbuf)))
+                goto err_abort;
+        }
 
-		const int sndbuf = (int) options.sndbuf;
-		if (sndbuf) {
-		    if (!pgm_setsockopt (sock, SOL_SOCKET, SO_SNDBUF, &sndbuf,
-		          sizeof (sndbuf)))
-		        goto err_abort;
-		}
-
-		const int max_tpdu = (int) pgm_max_tpdu;
-		if (!pgm_setsockopt (sock, IPPROTO_PGM, PGM_MTU, &max_tpdu,
-		      sizeof (max_tpdu)))
-		    goto err_abort;
+        //  Set maximum transport protocol data unit size (TPDU).
+        if (!pgm_setsockopt (sock, IPPROTO_PGM, PGM_MTU, &max_tpdu,
+              sizeof (max_tpdu)))
+            goto err_abort;
     }
 
     if (receiver) {
@@ -241,7 +232,7 @@ int zmq::pgm_socket_t::init (bool udp_encapsulation_, const char *network_)
             goto err_abort;
     } else {
         const int send_only        = 1,
-                  max_rte      = (int) ((options.rate * 1000) / 8),
+                  max_rte          = (int) ((options.rate * 1000) / 8),
                   txw_max_tpdu     = (int) pgm_max_tpdu,
                   txw_sqns         = compute_sqns (txw_max_tpdu),
                   ambient_spm      = pgm_secs (30),
@@ -275,13 +266,20 @@ int zmq::pgm_socket_t::init (bool udp_encapsulation_, const char *network_)
     addr.sa_port = port_number;
     addr.sa_addr.sport = DEFAULT_DATA_SOURCE_PORT;
 
-    //  Create random GSI.
-    uint32_t buf [2];
-    buf [0] = generate_random ();
-    buf [1] = generate_random ();
-    if (!pgm_gsi_create_from_data (&addr.sa_addr.gsi, (uint8_t*) buf, 8))
-        goto err_abort;
+    if (options.identity.size () > 0) {
 
+        //  Create gsi from identity.
+        if (!pgm_gsi_create_from_data (&addr.sa_addr.gsi,
+              options.identity.data (), options.identity.size ()))
+            goto err_abort;
+    } else {
+
+        //  Generate random gsi.
+        std::string gsi_base = uuid_t ().to_string ();
+        if (!pgm_gsi_create_from_string (&addr.sa_addr.gsi,
+              gsi_base.c_str (), -1))
+            goto err_abort;
+    }
 
     //  Bind a transport to the specified network devices.
     struct pgm_interface_req_t if_req;
@@ -326,27 +324,24 @@ int zmq::pgm_socket_t::init (bool udp_encapsulation_, const char *network_)
 
     //  Set IP level parameters.
     {
-		// Multicast loopback disabled by default
-		const int multicast_loop = 0;
-		if (!pgm_setsockopt (sock, IPPROTO_PGM, PGM_MULTICAST_LOOP,
-		      &multicast_loop, sizeof (multicast_loop)))
-		    goto err_abort;
+        const int nonblocking      = 1,
+                  multicast_loop   = options.use_multicast_loop ? 1 : 0,
+                  multicast_hops   = 16,
 
-		const int multicast_hops = options.multicast_hops;
-		if (!pgm_setsockopt (sock, IPPROTO_PGM, PGM_MULTICAST_HOPS,
-		        &multicast_hops, sizeof (multicast_hops)))
-		    goto err_abort;
+                  //  Expedited Forwarding PHB for network elements, no ECN.
+                  dscp             = 0x2e << 2; 
 
-		//  Expedited Forwarding PHB for network elements, no ECN.
-		const int dscp = 0x2e << 2;
-		if (AF_INET6 != sa_family && !pgm_setsockopt (sock,
-		      IPPROTO_PGM, PGM_TOS, &dscp, sizeof (dscp)))
-		    goto err_abort;
-
-		const int nonblocking = 1;
-		if (!pgm_setsockopt (sock, IPPROTO_PGM, PGM_NOBLOCK,
-		      &nonblocking, sizeof (nonblocking)))
-		    goto err_abort;
+        if (!pgm_setsockopt (sock, IPPROTO_PGM, PGM_MULTICAST_LOOP,
+                &multicast_loop, sizeof (multicast_loop)) ||
+            !pgm_setsockopt (sock, IPPROTO_PGM, PGM_MULTICAST_HOPS,
+                &multicast_hops, sizeof (multicast_hops)))
+            goto err_abort;
+        if (AF_INET6 != sa_family && !pgm_setsockopt (sock,
+              IPPROTO_PGM, PGM_TOS, &dscp, sizeof (dscp)))
+            goto err_abort;
+        if (!pgm_setsockopt (sock, IPPROTO_PGM, PGM_NOBLOCK,
+              &nonblocking, sizeof (nonblocking)))
+            goto err_abort;
     }
 
     //  Connect PGM transport to start state machine.
@@ -399,8 +394,8 @@ zmq::pgm_socket_t::~pgm_socket_t ()
 
 //  Get receiver fds. receive_fd_ is signaled for incoming packets,
 //  waiting_pipe_fd_ is signaled for state driven events and data.
-void zmq::pgm_socket_t::get_receiver_fds (fd_t *receive_fd_, 
-    fd_t *waiting_pipe_fd_)
+void zmq::pgm_socket_t::get_receiver_fds (int *receive_fd_, 
+    int *waiting_pipe_fd_)
 {
     socklen_t socklen;
     bool rc;
@@ -426,8 +421,8 @@ void zmq::pgm_socket_t::get_receiver_fds (fd_t *receive_fd_,
 //  receive_fd_ is for incoming back-channel protocol packets.
 //  rdata_notify_fd_ is raised for waiting repair transmissions.
 //  pending_notify_fd_ is for state driven events.
-void zmq::pgm_socket_t::get_sender_fds (fd_t *send_fd_, fd_t *receive_fd_, 
-    fd_t *rdata_notify_fd_, fd_t *pending_notify_fd_)
+void zmq::pgm_socket_t::get_sender_fds (int *send_fd_, int *receive_fd_, 
+    int *rdata_notify_fd_, int *pending_notify_fd_)
 {
     socklen_t socklen;
     bool rc;
@@ -472,7 +467,7 @@ size_t zmq::pgm_socket_t::send (unsigned char *data_, size_t data_len_)
     //  We have to write all data as one packet.
     if (nbytes > 0) {
         zmq_assert (status == PGM_IO_STATUS_NORMAL);
-        zmq_assert (nbytes == data_len_);
+        zmq_assert ((ssize_t) nbytes == (ssize_t) data_len_);
     } else {
         zmq_assert (status == PGM_IO_STATUS_RATE_LIMITED ||
             status == PGM_IO_STATUS_WOULD_BLOCK);
@@ -686,15 +681,20 @@ void zmq::pgm_socket_t::process_upstream ()
 int zmq::pgm_socket_t::compute_sqns (int tpdu_)
 {
     //  Convert rate into B/ms.
-    uint64_t rate = uint64_t (options.rate) / 8;
+    uint64_t rate = ((uint64_t) options.rate) / 8;
+
+    //  Get recovery interval in milliseconds.
+    uint64_t interval = options.recovery_ivl_msec >= 0 ?
+        options.recovery_ivl_msec :
+        options.recovery_ivl * 1000;
         
     //  Compute the size of the buffer in bytes.
-    uint64_t size = uint64_t (options.recovery_ivl) * rate;
+    uint64_t size = interval * rate;
 
     //  Translate the size into number of packets.
     uint64_t sqns = size / tpdu_;
 
-    //  Buffer should be able to hold at least one packet.
+    //  Buffer should be able to contain at least one packet.
     if (sqns == 0)
         sqns = 1;
 

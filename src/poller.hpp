@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2010-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -22,61 +21,53 @@
 #ifndef __ZMQ_POLLER_HPP_INCLUDED__
 #define __ZMQ_POLLER_HPP_INCLUDED__
 
-#include "platform.hpp"
+#include "epoll.hpp"
+#include "poll.hpp"
+#include "select.hpp"
+#include "devpoll.hpp"
+#include "kqueue.hpp"
+
+namespace zmq
+{
 
 #if defined ZMQ_FORCE_SELECT
-#define ZMQ_USE_SELECT
-#include "select.hpp"
+    typedef select_t poller_t;
 #elif defined ZMQ_FORCE_POLL
-#define ZMQ_USE_POLL
-#include "poll.hpp"
+    typedef poll_t poller_t;
 #elif defined ZMQ_FORCE_EPOLL
-#define ZMQ_USE_EPOLL
-#include "epoll.hpp"
+    typedef epoll_t poller_t;
 #elif defined ZMQ_FORCE_DEVPOLL
-#define ZMQ_USE_DEVPOLL
-#include "devpoll.hpp"
+    typedef devpoll_t poller_t;
 #elif defined ZMQ_FORCE_KQUEUE
-#define ZMQ_USE_KQUEUE
-#include "kqueue.hpp"
+    typedef kqueue_t poller_t;
 #elif defined ZMQ_HAVE_LINUX
-#define ZMQ_USE_EPOLL
-#include "epoll.hpp"
+    typedef epoll_t poller_t;
 #elif defined ZMQ_HAVE_WINDOWS
-#define ZMQ_USE_SELECT
-#include "select.hpp"
+    typedef select_t poller_t;
 #elif defined ZMQ_HAVE_FREEBSD
-#define ZMQ_USE_KQUEUE
-#include "kqueue.hpp"
+    typedef kqueue_t poller_t;
 #elif defined ZMQ_HAVE_OPENBSD
-#define ZMQ_USE_KQUEUE
-#include "kqueue.hpp"
+    typedef kqueue_t poller_t;
 #elif defined ZMQ_HAVE_NETBSD
-#define ZMQ_USE_KQUEUE
-#include "kqueue.hpp"
+    typedef kqueue_t poller_t;
 #elif defined ZMQ_HAVE_SOLARIS
-#define ZMQ_USE_DEVPOLL
-#include "devpoll.hpp"
+    typedef devpoll_t poller_t;
 #elif defined ZMQ_HAVE_OSX
-#define ZMQ_USE_KQUEUE
-#include "kqueue.hpp"
+    typedef kqueue_t poller_t;
 #elif defined ZMQ_HAVE_QNXNTO
-#define ZMQ_USE_POLL
-#include "poll.hpp"
+    typedef poll_t poller_t;
 #elif defined ZMQ_HAVE_AIX
-#define ZMQ_USE_POLL
-#include "poll.hpp"
+    typedef poll_t poller_t;
 #elif defined ZMQ_HAVE_HPUX
-#define ZMQ_USE_DEVPOLL
-#include "devpoll.hpp"
+    typedef devpoll_t poller_t;
 #elif defined ZMQ_HAVE_OPENVMS
-#define ZMQ_USE_SELECT
-#include "select.hpp"
+    typedef select_t poller_t;
 #elif defined ZMQ_HAVE_CYGWIN
-#define ZMQ_USE_SELECT
-#include "select.hpp"
+    typedef select_t poller_t;
 #else
 #error Unsupported platform
 #endif
+
+}
 
 #endif

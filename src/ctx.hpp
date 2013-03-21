@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2007-2012 iMatix Corporation
-    Copyright (c) 2009-2011 250bpm s.r.o.
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -27,40 +26,39 @@
 #include <string>
 #include <stdarg.h>
 
+#include "../include/zmq.h"
+
 #include "mailbox.hpp"
+#include "semaphore.hpp"
+#include "ypipe.hpp"
 #include "array.hpp"
 #include "config.hpp"
 #include "mutex.hpp"
 #include "stdint.hpp"
+#include "thread.hpp"
 #include "options.hpp"
-#include "atomic_counter.hpp"
 
 namespace zmq
 {
-
-    class object_t;
-    class io_thread_t;
-    class socket_base_t;
-    class reaper_t;
-
     //  Information associated with inproc endpoint. Note that endpoint options
     //  are registered as well so that the peer can access them without a need
     //  for synchronisation, handshaking or similar.
     struct endpoint_t
     {
-        socket_base_t *socket;
+        class socket_base_t *socket;
         options_t options;
     };
 
     //  Context object encapsulates all the global state associated with
     //  the library.
-
+    
     class ctx_t
     {
     public:
 
-        //  Create the context object.
-        ctx_t ();
+        //  Create the context object. The argument specifies the size
+        //  of I/O thread pool to create.
+        ctx_t (uint32_t io_threads_);
 
         //  Returns false if object is not a context.
         bool check_tag ();
@@ -71,39 +69,37 @@ namespace zmq
         //  after the last one is closed.
         int terminate ();
 
-        //  Set and get context properties.
-        int set (int option_, int optval_);
-        int get (int option_);
-
         //  Create and destroy a socket.
-        zmq::socket_base_t *create_socket (int type_);
-        void destroy_socket (zmq::socket_base_t *socket_);
+        class socket_base_t *create_socket (int type_);
+        void destroy_socket (class socket_base_t *socket_);
 
         //  Send command to the destination thread.
         void send_command (uint32_t tid_, const command_t &command_);
 
         //  Returns the I/O thread that is the least busy at the moment.
         //  Affinity specifies which I/O threads are eligible (0 = all).
-        //  Returns NULL if no I/O thread is available.
-        zmq::io_thread_t *choose_io_thread (uint64_t affinity_);
+        //  Returns NULL is no I/O thread is available.
+        class io_thread_t *choose_io_thread (uint64_t affinity_);
 
         //  Returns reaper thread object.
-        zmq::object_t *get_reaper ();
+        class object_t *get_reaper ();
 
         //  Management of inproc endpoints.
         int register_endpoint (const char *addr_, endpoint_t &endpoint_);
-        void unregister_endpoints (zmq::socket_base_t *socket_);
+        void unregister_endpoints (class socket_base_t *socket_);
         endpoint_t find_endpoint (const char *addr_);
+
+        //  Logging.
+        void log (const char *format_, va_list args_);
 
         enum {
             term_tid = 0,
             reaper_tid = 1
         };
 
-        ~ctx_t ();
-
     private:
 
+        ~ctx_t ();
 
         //  Used to check whether the object is a context.
         uint32_t tag;
@@ -118,24 +114,20 @@ namespace zmq
         typedef std::vector <uint32_t> emtpy_slots_t;
         emtpy_slots_t empty_slots;
 
-        //  If true, zmq_init has been called but no socket has been created
-        //  yet. Launching of I/O threads is delayed.
-        bool starting;
-
         //  If true, zmq_term was already called.
         bool terminating;
 
         //  Synchronisation of accesses to global slot-related data:
         //  sockets, empty_slots, terminating. It also synchronises
-        //  access to zombie sockets as such (as opposed to slots) and provides
+        //  access to zombie sockets as such (as oposed to slots) and provides
         //  a memory barrier to ensure that all CPU cores see the same data.
         mutex_t slot_sync;
 
         //  The reaper thread.
-        zmq::reaper_t *reaper;
+        class reaper_t *reaper;
 
         //  I/O threads.
-        typedef std::vector <zmq::io_thread_t*> io_threads_t;
+        typedef std::vector <class io_thread_t*> io_threads_t;
         io_threads_t io_threads;
 
         //  Array of pointers to mailboxes for both application and I/O threads.
@@ -152,22 +144,16 @@ namespace zmq
         //  Synchronisation of access to the list of inproc endpoints.
         mutex_t endpoints_sync;
 
-        //  Maximum socket ID.
-        static atomic_counter_t max_socket_id;
-
-        //  Maximum number of sockets that can be opened at the same time.
-        int max_sockets;
-
-        //  Number of I/O threads to launch.
-        int io_thread_count;
-
-        //  Synchronisation of access to context options.
-        mutex_t opt_sync;
+        //  PUB socket for logging. The socket is shared among all the threads,
+        //  thus it is synchronised by a mutex.
+        class socket_base_t *log_socket;
+        mutex_t log_sync;
 
         ctx_t (const ctx_t&);
         const ctx_t &operator = (const ctx_t&);
     };
-
+    
 }
 
 #endif
+

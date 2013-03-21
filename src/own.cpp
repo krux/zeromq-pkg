@@ -1,6 +1,6 @@
 /*
-    Copyright (c) 2010-2011 250bpm s.r.o.
-    Copyright (c) 2010-2011 Other contributors as noted in the AUTHORS file
+    Copyright (c) 2007-2011 iMatix Corporation
+    Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
 
@@ -80,9 +80,22 @@ void zmq::own_t::launch_child (own_t *object_)
     send_own (this, object_);
 }
 
-void zmq::own_t::term_child (own_t *object_)
+void zmq::own_t::launch_sibling (own_t *object_)
 {
-    process_term_req (object_);
+    //  At this point it is important that object is plugged in before its
+    //  owner has a chance to terminate it. Thus, 'plug' command is sent before
+    //  the 'own' command. Given that the mailbox preserves ordering of
+    //  commands, 'term' command from the owner cannot make it to the object
+    //  before the already written 'plug' command.
+
+    //  Specify the owner of the object.
+    object_->set_owner (owner);
+
+    //  Plug the object into its I/O thread.
+    send_plug (object_);
+
+    //  Make parent own the object.
+    send_own (owner, object_);
 }
 
 void zmq::own_t::process_term_req (own_t *object_)
@@ -140,11 +153,6 @@ void zmq::own_t::terminate ()
     send_term_req (owner, this);
 }
 
-bool zmq::own_t::is_terminating ()
-{
-    return terminating;
-}
-
 void zmq::own_t::process_term (int linger_)
 {
     //  Double termination should never happen.
@@ -153,7 +161,7 @@ void zmq::own_t::process_term (int linger_)
     //  Send termination request to all owned objects.
     for (owned_t::iterator it = owned.begin (); it != owned.end (); ++it)
         send_term (*it, linger_);
-    register_term_acks ((int) owned.size ());
+    register_term_acks (owned.size ());
     owned.clear ();
 
     //  Start termination process and check whether by chance we cannot

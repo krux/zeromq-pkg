@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -27,18 +26,12 @@
 namespace zmq
 {
 
-    class object_t;
-    class own_t;
-    struct i_engine;
-    class pipe_t;
-    class socket_base_t;
-
     //  This structure defines the commands that can be sent between threads.
 
     struct command_t
     {
         //  Object to process the command.
-        zmq::object_t *destination;
+        class object_t *destination;
 
         enum type_t
         {
@@ -47,9 +40,8 @@ namespace zmq
             own,
             attach,
             bind,
-            activate_read,
-            activate_write,
-            hiccup,
+            activate_reader,
+            activate_writer,
             pipe_term,
             pipe_term_ack,
             term_req,
@@ -73,38 +65,36 @@ namespace zmq
 
             //  Sent to socket to let it know about the newly created object.
             struct {
-                zmq::own_t *object;
+                class own_t *object;
             } own;
 
             //  Attach the engine to the session. If engine is NULL, it informs
             //  session that the connection have failed.
             struct {
                 struct i_engine *engine;
+                unsigned char peer_identity_size;
+                unsigned char *peer_identity;
             } attach;
 
             //  Sent from session to socket to establish pipe(s) between them.
             //  Caller have used inc_seqnum beforehand sending the command.
             struct {
-                zmq::pipe_t *pipe;
+                class reader_t *in_pipe;
+                class writer_t *out_pipe;
+                unsigned char peer_identity_size;
+                unsigned char *peer_identity;
             } bind;
 
             //  Sent by pipe writer to inform dormant pipe reader that there
             //  are messages in the pipe.
             struct {
-            } activate_read;
+            } activate_reader;
 
             //  Sent by pipe reader to inform pipe writer about how many
             //  messages it has read so far.
             struct {
                 uint64_t msgs_read;
-            } activate_write;
-
-            //  Sent by pipe reader to writer after creating a new inpipe.
-            //  The parameter is actually of type pipe_t::upipe_t, however,
-            //  its definition is private so we'll have to do with void*.
-            struct {
-                void *pipe;
-            } hiccup;
+            } activate_writer;
 
             //  Sent by pipe reader to pipe writer to ask it to terminate
             //  its end of the pipe.
@@ -118,7 +108,7 @@ namespace zmq
             //  Sent by I/O object ot the socket to request the shutdown of
             //  the I/O object.
             struct {
-                zmq::own_t *object;
+                class own_t *object;
             } term_req;
 
             //  Sent by socket to I/O object to start its shutdown.
@@ -134,7 +124,7 @@ namespace zmq
             //  Transfers the ownership of the closed socket
             //  to the reaper thread.
             struct {
-                zmq::socket_base_t *socket;
+                class socket_base_t *socket;
             } reap;
 
             //  Closed socket notifies the reaper that it's already deallocated.
@@ -148,6 +138,9 @@ namespace zmq
 
         } args;
     };
+
+    //  Function to deallocate dynamically allocated components of the command.
+    void deallocate_command (command_t *cmd_);
 
 }    
 

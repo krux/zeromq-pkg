@@ -7,13 +7,6 @@ Copyright (C) 1994, 1995, 1996, 1999, 2000, 2001, 2002, 2004, 2005,
 This file is free documentation; the Free Software Foundation gives
 unlimited permission to copy, distribute and modify it.
 
-From GitHub
-===========
-
-If you clone the Git repository then you should start by running the
-command `./autogen.sh`. This is not necessary if you get the source
-packages.
-
 Basic Installation
 ==================
 
@@ -47,9 +40,7 @@ may remove or edit it.
    The file `configure.ac' (or `configure.in') is used to create
 `configure' by a program called `autoconf'.  You need `configure.ac' if
 you want to change it or regenerate `configure' using a newer version
-of `autoconf'.  If you are building a development version from the
-Github source, for example, use `./autogen.sh' to generate `configure'
-and other necessary installation scripts.
+of `autoconf'.
 
 The simplest way to compile this package is:
 

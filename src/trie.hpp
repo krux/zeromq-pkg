@@ -1,7 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
-    Copyright (c) 2011-2012 Spotify AB
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -37,33 +35,15 @@ namespace zmq
         trie_t ();
         ~trie_t ();
 
-        //  Add key to the trie. Returns true if this is a new item in the trie
-        //  rather than a duplicate.
-        bool add (unsigned char *prefix_, size_t size_);
-
-        //  Remove key from the trie. Returns true if the item is actually
-        //  removed from the trie.
+        void add (unsigned char *prefix_, size_t size_);
         bool rm (unsigned char *prefix_, size_t size_);
-
-        //  Check whether particular key is in the trie.
         bool check (unsigned char *data_, size_t size_);
 
-        //  Apply the function supplied to each subscription in the trie.
-        void apply (void (*func_) (unsigned char *data_, size_t size_,
-            void *arg_), void *arg_);
-
     private:
-
-        void apply_helper (
-            unsigned char **buff_, size_t buffsize_, size_t maxbuffsize_,
-            void (*func_) (unsigned char *data_, size_t size_, void *arg_),
-            void *arg_);
-        bool is_redundant () const;
 
         uint32_t refcnt;
         unsigned char min;
         unsigned short count;
-        unsigned short live_nodes;
         union {
             class trie_t *node;
             class trie_t **table;

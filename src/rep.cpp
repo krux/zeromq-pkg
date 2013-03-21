@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2007-2012 iMatix Corporation
-    Copyright (c) 2009-2011 250bpm s.r.o.
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -19,12 +18,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "../include/zmq.h"
+
 #include "rep.hpp"
 #include "err.hpp"
-#include "msg.hpp"
 
-zmq::rep_t::rep_t (class ctx_t *parent_, uint32_t tid_, int sid_) :
-    router_t (parent_, tid_, sid_),
+zmq::rep_t::rep_t (class ctx_t *parent_, uint32_t tid_) :
+    xrep_t (parent_, tid_),
     sending_reply (false),
     request_begins (true)
 {
@@ -35,7 +35,7 @@ zmq::rep_t::~rep_t ()
 {
 }
 
-int zmq::rep_t::xsend (msg_t *msg_, int flags_)
+int zmq::rep_t::xsend (zmq_msg_t *msg_, int flags_)
 {
     //  If we are in the middle of receiving a request, we cannot send reply.
     if (!sending_reply) {
@@ -43,10 +43,10 @@ int zmq::rep_t::xsend (msg_t *msg_, int flags_)
         return -1;
     }
 
-    bool more = msg_->flags () & msg_t::more ? true : false;
+    bool more = (msg_->flags & ZMQ_MSG_MORE);
 
     //  Push message to the reply pipe.
-    int rc = router_t::xsend (msg_, flags_);
+    int rc = xrep_t::xsend (msg_, flags_);
     if (rc != 0)
         return rc;
 
@@ -57,7 +57,7 @@ int zmq::rep_t::xsend (msg_t *msg_, int flags_)
     return 0;
 }
 
-int zmq::rep_t::xrecv (msg_t *msg_, int flags_)
+int zmq::rep_t::xrecv (zmq_msg_t *msg_, int flags_)
 {
     //  If we are in middle of sending a reply, we cannot receive next request.
     if (sending_reply) {
@@ -65,42 +65,47 @@ int zmq::rep_t::xrecv (msg_t *msg_, int flags_)
         return -1;
     }
 
-    //  First thing to do when receiving a request is to copy all the labels
-    //  to the reply pipe.
     if (request_begins) {
-        while (true) {
-            int rc = router_t::xrecv (msg_, flags_);
+
+        //  Copy the backtrace stack to the reply pipe.
+        bool bottom = false;
+        while (!bottom) {
+
+            //  TODO: What if request can be read but reply pipe is not
+            //  ready for writing?
+
+            //  Get next part of the backtrace stack.
+            int rc = xrep_t::xrecv (msg_, flags_);
             if (rc != 0)
                 return rc;
 
-            if ((msg_->flags () & msg_t::more)) {
+            if ((msg_->flags & ZMQ_MSG_MORE)) {
                 //  Empty message part delimits the traceback stack.
-                bool bottom = (msg_->size () == 0);
+                bottom = (zmq_msg_size (msg_) == 0);
 
                 //  Push it to the reply pipe.
-                rc = router_t::xsend (msg_, flags_);
-                errno_assert (rc == 0);
-
-                if (bottom)
-                    break;
+                rc = xrep_t::xsend (msg_, flags_);
+                zmq_assert (rc == 0);
             }
             else {
                 //  If the traceback stack is malformed, discard anything
                 //  already sent to pipe (we're at end of invalid message).
-                rc = router_t::rollback ();
-                errno_assert (rc == 0);
+                rc = xrep_t::rollback ();
+                zmq_assert (rc == 0);
             }
         }
+
         request_begins = false;
     }
 
-    //  Get next message part to return to the user.
-    int rc = router_t::xrecv (msg_, flags_);
+    //  Now the routing info is safely stored. Get the first part
+    //  of the message payload and exit.
+    int rc = xrep_t::xrecv (msg_, flags_);
     if (rc != 0)
-       return rc;
+        return rc;
 
     //  If whole request is read, flip the FSM to reply-sending state.
-    if (!(msg_->flags () & msg_t::more)) {
+    if (!(msg_->flags & ZMQ_MSG_MORE)) {
         sending_reply = true;
         request_begins = true;
     }
@@ -113,7 +118,7 @@ bool zmq::rep_t::xhas_in ()
     if (sending_reply)
         return false;
 
-    return router_t::xhas_in ();
+    return xrep_t::xhas_in ();
 }
 
 bool zmq::rep_t::xhas_out ()
@@ -121,17 +126,6 @@ bool zmq::rep_t::xhas_out ()
     if (!sending_reply)
         return false;
 
-    return router_t::xhas_out ();
-}
-
-zmq::rep_session_t::rep_session_t (io_thread_t *io_thread_, bool connect_,
-      socket_base_t *socket_, const options_t &options_,
-      const address_t *addr_) :
-    router_session_t (io_thread_, connect_, socket_, options_, addr_)
-{
-}
-
-zmq::rep_session_t::~rep_session_t ()
-{
+    return xrep_t::xhas_out ();
 }
 

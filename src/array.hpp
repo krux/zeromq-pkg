@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -28,12 +27,10 @@
 namespace zmq
 {
 
-    //  Base class for objects stored in the array. If you want to store
-    //  same object in mutliple arrays, each of those arrays has to have
-    //  different ID. The item itself has to be derived from instantiations of
-    //  array_item_t template for all relevant IDs.
+    //  Base class for objects stored in the array. Note that each object can
+    //  be stored in at most one array.
 
-    template <int ID = 0> class array_item_t
+    class array_item_t
     {
     public:
 
@@ -68,14 +65,10 @@ namespace zmq
 
     //  Fast array implementation with O(1) access to item, insertion and
     //  removal. Array stores pointers rather than objects. The objects have
-    //  to be derived from array_item_t<ID> class.
+    //  to be derived from array_item_t class.
 
-    template <typename T, int ID = 0> class array_t
+    template <typename T> class array_t
     {
-    private:
-
-        typedef array_item_t <ID> item_t;
-
     public:
 
         typedef typename std::vector <T*>::size_type size_type;
@@ -106,17 +99,17 @@ namespace zmq
         inline void push_back (T *item_)
         {
             if (item_)
-                ((item_t*) item_)->set_array_index ((int) items.size ());
+                item_->set_array_index (items.size ());
             items.push_back (item_);
         }
 
         inline void erase (T *item_) {
-            erase (((item_t*) item_)->get_array_index ());
+            erase (item_->get_array_index ());
         }
 
         inline void erase (size_type index_) {
             if (items.back ())
-                ((item_t*) items.back ())->set_array_index ((int) index_);
+                items.back ()->set_array_index (index_);
             items [index_] = items.back ();
             items.pop_back ();
         }
@@ -124,9 +117,9 @@ namespace zmq
         inline void swap (size_type index1_, size_type index2_)
         {
             if (items [index1_])
-                ((item_t*) items [index1_])->set_array_index ((int) index2_);
+                items [index1_]->set_array_index (index2_);
             if (items [index2_])
-                ((item_t*) items [index2_])->set_array_index ((int) index1_);
+                items [index2_]->set_array_index (index1_);
             std::swap (items [index1_], items [index2_]);
         }
 
@@ -137,7 +130,7 @@ namespace zmq
 
         inline size_type index (T *item_)
         {
-            return (size_type) ((item_t*) item_)->get_array_index ();
+            return (size_type) item_->get_array_index ();
         }
 
     private:
@@ -152,4 +145,3 @@ namespace zmq
 }
 
 #endif
-

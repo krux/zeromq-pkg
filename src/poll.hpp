@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -22,9 +21,13 @@
 #ifndef __ZMQ_POLL_HPP_INCLUDED__
 #define __ZMQ_POLL_HPP_INCLUDED__
 
-//  poller.hpp decides which polling mechanism to use.
-#include "poller.hpp"
-#if defined ZMQ_USE_POLL
+#include "platform.hpp"
+
+#if defined ZMQ_HAVE_LINUX || defined ZMQ_HAVE_FREEBSD ||\
+    defined ZMQ_HAVE_OPENBSD || defined ZMQ_HAVE_SOLARIS ||\
+    defined ZMQ_HAVE_OSX || defined ZMQ_HAVE_QNXNTO ||\
+    defined ZMQ_HAVE_HPUX || defined ZMQ_HAVE_AIX ||\
+    defined ZMQ_HAVE_NETBSD
 
 #include <poll.h>
 #include <stddef.h>
@@ -36,8 +39,6 @@
 
 namespace zmq
 {
-
-    struct i_poll_events;
 
     //  Implements socket polling mechanism using the POSIX.1-2001
     //  poll() system call.
@@ -52,7 +53,7 @@ namespace zmq
         ~poll_t ();
 
         //  "poller" concept.
-        handle_t add_fd (fd_t fd_, zmq::i_poll_events *events_);
+        handle_t add_fd (fd_t fd_, struct i_poll_events *events_);
         void rm_fd (handle_t handle_);
         void set_pollin (handle_t handle_);
         void reset_pollin (handle_t handle_);
@@ -72,7 +73,7 @@ namespace zmq
         struct fd_entry_t
         {
             fd_t index;
-            zmq::i_poll_events *events;
+            struct i_poll_events *events;
         };
 
         //  This table stores data for registered descriptors.
@@ -95,8 +96,6 @@ namespace zmq
         poll_t (const poll_t&);
         const poll_t &operator = (const poll_t&);
     };
-
-    typedef poll_t poller_t;
 
 }
 

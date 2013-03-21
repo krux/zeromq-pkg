@@ -1,6 +1,6 @@
 /*
-    Copyright (c) 2010-2011 250bpm s.r.o.
-    Copyright (c) 2010-2011 Other contributors as noted in the AUTHORS file
+    Copyright (c) 2007-2011 iMatix Corporation
+    Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
 
@@ -18,36 +18,14 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdio.h>
 #include "testutil.hpp"
 
-int main (void)
+using namespace std;
+using namespace zmqtestutil;
+
+int main (int argc, char *argv [])
 {
-    fprintf (stderr, "test_reqrep_ipc running...\n");
-
-    void *ctx = zmq_init (1);
-    assert (ctx);
-
-    void *sb = zmq_socket (ctx, ZMQ_REP);
-    assert (sb);
-    int rc = zmq_bind (sb, "ipc:///tmp/tester");
-    assert (rc == 0);
-
-    void *sc = zmq_socket (ctx, ZMQ_REQ);
-    assert (sc);
-    rc = zmq_connect (sc, "ipc:///tmp/tester");
-    assert (rc == 0);
-    
-    bounce (sb, sc);
-
-    rc = zmq_close (sc);
-    assert (rc == 0);
-
-    rc = zmq_close (sb);
-    assert (rc == 0);
-
-    rc = zmq_term (ctx);
-    assert (rc == 0);
-
+    const char *transport = "ipc:///tmp/tester" ;
+    basic_tests (transport, ZMQ_REQ, ZMQ_REP);
     return 0 ;
 }

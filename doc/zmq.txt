@@ -19,7 +19,7 @@ DESCRIPTION
 The 0MQ lightweight messaging kernel is a library which extends the standard
 socket interfaces with features traditionally provided by specialised
 _messaging middleware_ products. 0MQ sockets provide an abstraction of
-asynchronous _message queues_, multiple _messaging patterns_, message
+asynchronous  _message queues_, multiple _messaging patterns_, message
 filtering (_subscriptions_), seamless access to multiple _transport protocols_
 and more.
 
@@ -30,24 +30,9 @@ provided by the 0MQ library.
 
 Context
 ~~~~~~~
-Before using any 0MQ library functions you must create a 0MQ 'context'. When
-you exit your application you must destroy the 'context'. These functions let
-you work with 'contexts':
-
-Create a new 0MQ context::
-    linkzmq:zmq_ctx_new[3]
-
-Work with context properties::
-    linkzmq:zmq_ctx_set[3]
-    linkzmq:zmq_ctx_get[3]
-
-Destroy a 0MQ context::
-    linkzmq:zmq_ctx_destroy[3]
-
-Monitor a 0MQ context::
-    linkzmq:zmq_ctx_set_monitor[3]
-
-These deprecated functions let you create and destroy 'contexts':
+Before using any 0MQ library functions the caller must initialise a 0MQ
+'context' using _zmq_init()_. The following functions are provided to handle
+initialisation and termination of a 'context':
 
 Initialise 0MQ context::
     linkzmq:zmq_init[3]
@@ -92,21 +77,12 @@ Initialise a message::
     linkzmq:zmq_msg_init_size[3]
     linkzmq:zmq_msg_init_data[3]
 
-Sending and receiving a message::
-    linkzmq:zmq_msg_send[3]
-    linkzmq:zmq_msg_recv[3]
-
 Release a message::
     linkzmq:zmq_msg_close[3]
 
 Access message content::
     linkzmq:zmq_msg_data[3]
     linkzmq:zmq_msg_size[3]
-    linkzmq:zmq_msg_more[3]
-
-Work with message properties::
-    linkzmq:zmq_msg_get[3]
-    linkzmq:zmq_msg_set[3]
 
 Message manipulation::
     linkzmq:zmq_msg_copy[3]
@@ -136,8 +112,6 @@ Establishing a message flow::
     linkzmq:zmq_connect[3]
 
 Sending and receiving messages::
-    linkzmq:zmq_msg_send[3]
-    linkzmq:zmq_msg_recv[3]
     linkzmq:zmq_send[3]
     linkzmq:zmq_recv[3]
 
@@ -169,12 +143,14 @@ Local in-process (inter-thread) communication transport::
     linkzmq:zmq_inproc[7]
 
 
-Proxies
+Devices
 ~~~~~~~
-0MQ provides 'proxies' to create fanout and fan-in topologies. A proxy connects
-a 'frontend' socket to a 'backend' socket and switches all messages between the
-two sockets, opaquely. A proxy may optionally capture all traffic to a third
-socket. To start a proxy in an application thread, use linkzmq:zmq_proxy[3].
+0MQ provides 'devices', which are building blocks that act as intermediate
+nodes in complex messaging topologies. Devices can act as brokers that other
+nodes connect to, proxies that connect through to other nodes, or any mix of
+these two models.
+
+You can start a device in an application thread, see linkzmq:zmq_device[3].
 
 
 ERROR HANDLING
@@ -209,14 +185,23 @@ by C programmers. The intent is that programmers using 0MQ from other languages
 shall refer to this documentation alongside any documentation provided by the
 vendor of their language binding.
 
-Language bindings ($$C++$$, Python, PHP, Ruby, Java and more) are provided by
-members of the 0MQ community and pointers can be found on the 0MQ website.
+
+C++ language binding
+~~~~~~~~~~~~~~~~~~~~
+The 0MQ distribution includes a $$C++$$ language binding, which is documented
+separately in linkzmq:zmq_cpp[7].
+
+
+Other language bindings
+~~~~~~~~~~~~~~~~~~~~~~~
+Other language bindings (Python, Ruby, Java and more) are provided by members
+of the 0MQ community and pointers can be found on the 0MQ website.
 
 
 AUTHORS
 -------
-This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com>,
-Martin Lucina <martin@lucina.net>, and Pieter Hintjens <ph@imatix.com>.
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.
 
 
 RESOURCES

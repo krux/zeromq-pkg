@@ -1,7 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
-    Copyright (c) 2010-2011 Miru Limited
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -31,10 +29,10 @@
 #endif
 
 #include "pgm_receiver.hpp"
-#include "session_base.hpp"
+#include "err.hpp"
 #include "stdint.hpp"
 #include "wire.hpp"
-#include "err.hpp"
+#include "i_inout.hpp"
 
 zmq::pgm_receiver_t::pgm_receiver_t (class io_thread_t *parent_, 
       const options_t &options_) :
@@ -42,7 +40,7 @@ zmq::pgm_receiver_t::pgm_receiver_t (class io_thread_t *parent_,
     has_rx_timer (false),
     pgm_socket (true, options_),
     options (options_),
-    session (NULL),
+    inout (NULL),
     mru_decoder (NULL),
     pending_bytes (0)
 {
@@ -59,22 +57,18 @@ int zmq::pgm_receiver_t::init (bool udp_encapsulation_, const char *network_)
     return pgm_socket.init (udp_encapsulation_, network_);
 }
 
-void zmq::pgm_receiver_t::plug (io_thread_t *io_thread_,
-    session_base_t *session_)
+void zmq::pgm_receiver_t::plug (io_thread_t *io_thread_, i_inout *inout_)
 {
     //  Retrieve PGM fds and start polling.
-    fd_t socket_fd = retired_fd;
-    fd_t waiting_pipe_fd = retired_fd;
+    int socket_fd;
+    int waiting_pipe_fd;
     pgm_socket.get_receiver_fds (&socket_fd, &waiting_pipe_fd);
     socket_handle = add_fd (socket_fd);
     pipe_handle = add_fd (waiting_pipe_fd);
     set_pollin (pipe_handle);
     set_pollin (socket_handle);
 
-    session = session_;
-
-    //  If there are any subscriptions already queued in the session, drop them.
-    drop_subscriptions ();
+    inout = inout_;
 }
 
 void zmq::pgm_receiver_t::unplug ()
@@ -97,7 +91,7 @@ void zmq::pgm_receiver_t::unplug ()
     rm_fd (socket_handle);
     rm_fd (pipe_handle);
 
-    session = NULL;
+    inout = NULL;
 }
 
 void zmq::pgm_receiver_t::terminate ()
@@ -108,7 +102,7 @@ void zmq::pgm_receiver_t::terminate ()
 
 void zmq::pgm_receiver_t::activate_out ()
 {
-    drop_subscriptions ();
+    zmq_assert (false);
 }
 
 void zmq::pgm_receiver_t::activate_in ()
@@ -117,15 +111,8 @@ void zmq::pgm_receiver_t::activate_in ()
     //  processed the whole buffer but failed to write
     //  the last message into the pipe.
     if (pending_bytes == 0) {
-        if (mru_decoder != NULL) {
+        if (mru_decoder != NULL)
             mru_decoder->process_buffer (NULL, 0);
-            session->flush ();
-        }
-
-        //  Resume polling.
-        set_pollin (pipe_handle);
-        set_pollin (socket_handle);
-
         return;
     }
 
@@ -135,7 +122,6 @@ void zmq::pgm_receiver_t::activate_in ()
     //  Ask the decoder to process remaining data.
     size_t n = mru_decoder->process_buffer (pending_ptr, pending_bytes);
     pending_bytes -= n;
-    session->flush ();
 
     if (pending_bytes > 0)
         return;
@@ -153,8 +139,7 @@ void zmq::pgm_receiver_t::in_event ()
     unsigned char *data = NULL;
     const pgm_tsi_t *tsi = NULL;
 
-    if (pending_bytes > 0)
-        return;
+    zmq_assert (pending_bytes == 0);
 
     if (has_rx_timer) {
         cancel_timer (rx_timer_id);
@@ -230,10 +215,9 @@ void zmq::pgm_receiver_t::in_event ()
             it->second.joined = true;
 
             //  Create and connect decoder for the peer.
-            it->second.decoder = new (std::nothrow) decoder_t (0,
-                options.maxmsgsize);
+            it->second.decoder = new (std::nothrow) decoder_t (0);
             alloc_assert (it->second.decoder);
-            it->second.decoder->set_msg_sink (session);
+            it->second.decoder->set_inout (inout);
         }
 
         mru_decoder = it->second.decoder;
@@ -259,7 +243,7 @@ void zmq::pgm_receiver_t::in_event ()
     }
 
     //  Flush any messages decoder may have produced.
-    session->flush ();
+    inout->flush ();
 }
 
 void zmq::pgm_receiver_t::timer_event (int token)
@@ -269,14 +253,6 @@ void zmq::pgm_receiver_t::timer_event (int token)
     //  Timer cancels on return by poller_base.
     has_rx_timer = false;
     in_event ();
-}
-
-void zmq::pgm_receiver_t::drop_subscriptions ()
-{
-    msg_t msg;
-    msg.init ();
-    while (session->pull_msg (&msg))
-        msg.close ();
 }
 
 #endif

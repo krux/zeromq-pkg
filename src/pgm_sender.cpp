@@ -1,7 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
-    Copyright (c) 2010-2011 Miru Limited
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -32,7 +30,6 @@
 
 #include "io_thread.hpp"
 #include "pgm_sender.hpp"
-#include "session_base.hpp"
 #include "err.hpp"
 #include "wire.hpp"
 #include "stdint.hpp"
@@ -64,15 +61,15 @@ int zmq::pgm_sender_t::init (bool udp_encapsulation_, const char *network_)
     return rc;
 }
 
-void zmq::pgm_sender_t::plug (io_thread_t *io_thread_, session_base_t *session_)
+void zmq::pgm_sender_t::plug (io_thread_t *io_thread_, i_inout *inout_)
 {
     //  Alocate 2 fds for PGM socket.
-    fd_t downlink_socket_fd = retired_fd;
-    fd_t uplink_socket_fd = retired_fd;
-    fd_t rdata_notify_fd = retired_fd;
-    fd_t pending_notify_fd = retired_fd;
+    int downlink_socket_fd = 0;
+    int uplink_socket_fd = 0;
+    int rdata_notify_fd = 0;
+    int pending_notify_fd = 0;
 
-    encoder.set_msg_source (session_);
+    encoder.set_inout (inout_);
 
     //  Fill fds from PGM transport and add them to the poller.
     pgm_socket.get_sender_fds (&downlink_socket_fd, &uplink_socket_fd,
@@ -109,7 +106,7 @@ void zmq::pgm_sender_t::unplug ()
     rm_fd (uplink_handle);
     rm_fd (rdata_notify_handle);
     rm_fd (pending_notify_handle);
-    encoder.set_msg_source (NULL);
+    encoder.set_inout (NULL);
 }
 
 void zmq::pgm_sender_t::terminate ()
@@ -197,7 +194,7 @@ void zmq::pgm_sender_t::out_event ()
             add_timer (timeout, tx_timer_id);
             has_tx_timer = true;
         } else
-            errno_assert (errno == EBUSY);
+            zmq_assert (errno == EBUSY);
     }
 }
 

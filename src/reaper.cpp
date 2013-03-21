@@ -1,6 +1,6 @@
 /*
-    Copyright (c) 2011 250bpm s.r.o.
-    Copyright (c) 2011 Other contributors as noted in the AUTHORS file
+    Copyright (c) 2007-2011 iMatix Corporation
+    Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
 
@@ -61,7 +61,7 @@ void zmq::reaper_t::in_event ()
 
         //  Get the next command. If there is none, exit.
         command_t cmd;
-        int rc = mailbox.recv (&cmd, 0);
+        int rc = mailbox.recv (&cmd, false);
         if (rc != 0 && errno == EINTR)
             continue;
         if (rc != 0 && errno == EAGAIN)
@@ -78,7 +78,7 @@ void zmq::reaper_t::out_event ()
     zmq_assert (false);
 }
 
-void zmq::reaper_t::timer_event (int)
+void zmq::reaper_t::timer_event (int id_)
 {
     zmq_assert (false);
 }
@@ -87,7 +87,7 @@ void zmq::reaper_t::process_stop ()
 {
     terminating = true;
 
-    //  If there are no sockets being reaped finish immediately.
+    //  If there are no sockets beig reaped finish immediately.
     if (!sockets) {
         send_done ();
         poller->rm_fd (mailbox_handle);
@@ -99,6 +99,10 @@ void zmq::reaper_t::process_reap (socket_base_t *socket_)
 {
     //  Add the socket to the poller.
     socket_->start_reaping (poller);
+
+    //  Start termination of associated I/O object hierarchy.
+    socket_->terminate ();
+    socket_->check_destroy ();
 
     ++sockets;
 }

@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -18,6 +17,8 @@
     You should have received a copy of the GNU Lesser General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+#include "../include/zmq.h"
 
 #include "err.hpp"
 #include "platform.hpp"
@@ -61,20 +62,6 @@ const char *zmq::errno_to_string (int errno_)
 #pragma warning (pop)
 #endif
     }
-}
-
-void zmq::zmq_abort(const char *errmsg_)
-{
-#if defined ZMQ_HAVE_WINDOWS
-
-    //  Raise STATUS_FATAL_APP_EXIT.
-    ULONG_PTR extra_info [1];
-    extra_info [0] = (ULONG_PTR) errmsg_;
-    RaiseException (0x40000015, EXCEPTION_NONCONTINUABLE, 1, extra_info);
-#else
-    (void)errmsg_;
-    abort ();
-#endif
 }
 
 #ifdef ZMQ_HAVE_WINDOWS
@@ -203,89 +190,49 @@ const char *zmq::wsa_error_no (int no_)
 void zmq::win_error (char *buffer_, size_t buffer_size_)
 {
     DWORD errcode = GetLastError ();
-#if defined WINCE
-    DWORD rc = FormatMessage (FORMAT_MESSAGE_FROM_SYSTEM |
-        FORMAT_MESSAGE_IGNORE_INSERTS, NULL, errcode, MAKELANGID(LANG_NEUTRAL,
-        SUBLANG_DEFAULT), (LPWSTR)buffer_, buffer_size_ / sizeof(wchar_t), NULL );
-#else
     DWORD rc = FormatMessageA (FORMAT_MESSAGE_FROM_SYSTEM |
         FORMAT_MESSAGE_IGNORE_INSERTS, NULL, errcode, MAKELANGID(LANG_NEUTRAL,
-        SUBLANG_DEFAULT), buffer_, (DWORD) buffer_size_, NULL );
-#endif
+        SUBLANG_DEFAULT), buffer_, buffer_size_, NULL );
     zmq_assert (rc);
 }
 
-int zmq::wsa_error_to_errno (int errcode)
+void zmq::wsa_error_to_errno ()
 {
+    int errcode = WSAGetLastError ();
     switch (errcode) {
-//  10009 - File handle is not valid.
-    case WSAEBADF:
-        return EBADF;
-//  10013 - Permission denied.
-    case WSAEACCES:
-        return EACCES;
-//  10014 - Bad address.
-    case WSAEFAULT:
-        return EFAULT;
-//  10022 - Invalid argument.
-    case WSAEINVAL:
-        return EINVAL;
-//  10024 - Too many open files.
-    case WSAEMFILE:
-        return EMFILE;
-//  10036 - Operation now in progress.
     case WSAEINPROGRESS:
-        return EAGAIN;
-//  10040 - Message too long.
-    case WSAEMSGSIZE:
-        return EMSGSIZE;
-//  10043 - Protocol not supported.
+        errno = EAGAIN;
+        return;
+    case WSAEBADF:
+        errno = EBADF;
+        return;
+    case WSAEINVAL:
+        errno = EINVAL;
+        return;
+    case WSAEMFILE:
+        errno = EMFILE;
+        return;
+    case WSAEFAULT:
+        errno = EFAULT;
+        return;
     case WSAEPROTONOSUPPORT:
-        return EPROTONOSUPPORT;
-//  10047 - Address family not supported by protocol family.
-    case WSAEAFNOSUPPORT:
-        return EAFNOSUPPORT;
-//  10048 - Address already in use.
-    case WSAEADDRINUSE:
-        return EADDRINUSE;
-//  10049 - Cannot assign requested address.
-    case WSAEADDRNOTAVAIL:
-        return EADDRNOTAVAIL;
-//  10050 - Network is down.
-    case WSAENETDOWN:
-        return ENETDOWN;
-//  10051 - Network is unreachable.
-    case WSAENETUNREACH:
-        return ENETUNREACH;
-//  10052 - Network dropped connection on reset.
-    case WSAENETRESET:
-        return ENETRESET;
-//  10053 - Software caused connection abort.
-    case WSAECONNABORTED:
-        return ECONNABORTED;
-//  10054 - Connection reset by peer.
-    case WSAECONNRESET:
-        return ECONNRESET;
-//  10055 - No buffer space available.
+        errno = EPROTONOSUPPORT;
+        return;
     case WSAENOBUFS:
-        return ENOBUFS;
-//  10057 - Socket is not connected.
-    case WSAENOTCONN:
-        return ENOTCONN;
-//  10060 - Connection timed out.
-    case WSAETIMEDOUT:
-        return ETIMEDOUT;
-//  10061 - Connection refused.
-    case WSAECONNREFUSED:
-        return ECONNREFUSED;
-//  10065 - No route to host.
-    case WSAEHOSTUNREACH:
-        return EHOSTUNREACH;
+        errno = ENOBUFS;
+        return;
+    case WSAENETDOWN:
+        errno = ENETDOWN;
+        return;
+    case WSAEADDRINUSE:
+        errno = EADDRINUSE;
+        return;
+    case WSAEADDRNOTAVAIL:
+        errno = EADDRNOTAVAIL;
+        return;
     default:
         wsa_assert (false);
     }
-    //  Not reachable
-    return 0;
 }
 
 #endif

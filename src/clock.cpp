@@ -1,6 +1,6 @@
 /*
-    Copyright (c) 2010-2011 250bpm s.r.o.
-    Copyright (c) 2010-2011 Other contributors as noted in the AUTHORS file
+    Copyright (c) 2007-2011 iMatix Corporation
+    Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
 
@@ -27,19 +27,11 @@
 #include <stddef.h>
 
 #if defined _MSC_VER
-#if defined WINCE
-#include <cmnintrin.h>
-#else
 #include <intrin.h>
-#endif
 #endif
 
 #if !defined ZMQ_HAVE_WINDOWS
 #include <sys/time.h>
-#endif
-
-#if defined HAVE_CLOCK_GETTIME || defined HAVE_GETHRTIME
-#include <time.h>
 #endif
 
 zmq::clock_t::clock_t () :
@@ -68,27 +60,6 @@ uint64_t zmq::clock_t::now_us ()
     //  since the system was started.
     double ticks_div = (double) (ticksPerSecond.QuadPart / 1000000);     
     return (uint64_t) (tick.QuadPart / ticks_div);
-
-#elif defined HAVE_CLOCK_GETTIME && defined CLOCK_MONOTONIC
-
-    //  Use POSIX clock_gettime function to get precise monotonic time.
-    struct timespec tv;
-    int rc = clock_gettime (CLOCK_MONOTONIC, &tv);
-		// Fix case where system has clock_gettime but CLOCK_MONOTONIC is not supported.
-		// This should be a configuration check, but I looked into it and writing an 
-		// AC_FUNC_CLOCK_MONOTONIC seems beyond my powers.
-		if( rc != 0) {
-			//  Use POSIX gettimeofday function to get precise time.
-			struct timeval tv;
-			int rc = gettimeofday (&tv, NULL);
-			errno_assert (rc == 0);
-			return (tv.tv_sec * (uint64_t) 1000000 + tv.tv_usec);
-		}
-    return (tv.tv_sec * (uint64_t) 1000000 + tv.tv_nsec / 1000);
-
-#elif defined HAVE_GETHRTIME
-
-    return (gethrtime () / 1000);
 
 #else
 

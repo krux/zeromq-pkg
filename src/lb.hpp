@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2010-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -28,27 +27,28 @@
 namespace zmq
 {
 
-    //  This class manages a set of outbound pipes. On send it load balances
+    //  Class manages a set of outbound pipes. On send it load balances
     //  messages fairly among the pipes.
-
-    class lb_t
+    class lb_t : public i_writer_events
     {
     public:
 
-        lb_t ();
+        lb_t (class own_t *sink_);
         ~lb_t ();
 
-        void attach (pipe_t *pipe_);
-        void activated (pipe_t *pipe_);
-        void terminated (pipe_t *pipe_);
-
-        int send (msg_t *msg_, int flags_);
+        void attach (writer_t *pipe_);
+        void terminate ();
+        int send (zmq_msg_t *msg_, int flags_);
         bool has_out ();
+
+        //  i_writer_events interface implementation.
+        void activated (writer_t *pipe_);
+        void terminated (writer_t *pipe_);
 
     private:
 
         //  List of outbound pipes.
-        typedef array_t <pipe_t, 2> pipes_t;
+        typedef array_t <class writer_t> pipes_t;
         pipes_t pipes;
 
         //  Number of active pipes. All the active pipes are located at the
@@ -63,6 +63,12 @@ namespace zmq
 
         //  True if we are dropping current message.
         bool dropping;
+
+        //  Object to send events to.
+        class own_t *sink;
+
+        //  If true, termination process is already underway.
+        bool terminating;
 
         lb_t (const lb_t&);
         const lb_t &operator = (const lb_t&);

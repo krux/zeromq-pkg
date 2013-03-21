@@ -1,7 +1,5 @@
 /*
-    Copyright (c) 2007-2012 iMatix Corporation
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2011 VMware, Inc.
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -23,38 +21,30 @@
 #ifndef __ZMQ_SOCKET_BASE_HPP_INCLUDED__
 #define __ZMQ_SOCKET_BASE_HPP_INCLUDED__
 
-#include <string>
 #include <map>
-#include <stdarg.h>
+#include <vector>
+
+#include "../include/zmq.h"
 
 #include "own.hpp"
 #include "array.hpp"
+#include "mutex.hpp"
 #include "stdint.hpp"
 #include "poller.hpp"
 #include "atomic_counter.hpp"
 #include "i_poll_events.hpp"
 #include "mailbox.hpp"
 #include "stdint.hpp"
-#include "clock.hpp"
-#include "pipe.hpp"
-
-extern "C"
-{
-    void zmq_free_event (void *data, void *hint);
-}
+#include "blob.hpp"
+#include "own.hpp"
 
 namespace zmq
 {
 
-    class ctx_t;
-    class msg_t;
-    class pipe_t;
-
     class socket_base_t :
         public own_t,
-        public array_item_t <>,
-        public i_poll_events,
-        public i_pipe_events
+        public array_item_t,
+        public i_poll_events
     {
         friend class reaper_t;
 
@@ -64,8 +54,8 @@ namespace zmq
         bool check_tag ();
 
         //  Create a socket of a specified type.
-        static socket_base_t *create (int type_, zmq::ctx_t *parent_,
-            uint32_t tid_, int sid_);
+        static socket_base_t *create (int type_, class ctx_t *parent_,
+            uint32_t tid_);
 
         //  Returns the mailbox associated with this socket.
         mailbox_t *get_mailbox ();
@@ -79,15 +69,27 @@ namespace zmq
         int getsockopt (int option_, void *optval_, size_t *optvallen_);
         int bind (const char *addr_);
         int connect (const char *addr_);
-        int term_endpoint (const char *addr_);
-        int send (zmq::msg_t *msg_, int flags_);
-        int recv (zmq::msg_t *msg_, int flags_);
+        int send (zmq_msg_t *msg_, int flags_);
+        int recv (zmq_msg_t *msg_, int flags_);
         int close ();
 
         //  These functions are used by the polling mechanism to determine
         //  which events are to be reported from this socket.
         bool has_in ();
         bool has_out ();
+
+        //  Registry of named sessions.
+        bool register_session (const blob_t &name_, class session_t *session_);
+        void unregister_session (const blob_t &name_);
+        class session_t *find_session (const blob_t &name_);
+
+        //  i_reader_events interface implementation.
+        void activated (class reader_t *pipe_);
+        void terminated (class reader_t *pipe_);
+
+        //  i_writer_events interface implementation.
+        void activated (class writer_t *pipe_);
+        void terminated (class writer_t *pipe_);
 
         //  Using this function reaper thread ask the socket to regiter with
         //  its poller.
@@ -99,36 +101,19 @@ namespace zmq
         void out_event ();
         void timer_event (int id_);
 
-        //  i_pipe_events interface implementation.
-        void read_activated (pipe_t *pipe_);
-        void write_activated (pipe_t *pipe_);
-        void hiccuped (pipe_t *pipe_);
-        void terminated (pipe_t *pipe_);
-        void lock();
-        void unlock();
-
-        int monitor(const char *endpoint_, int events_);
-
-        void event_connected (std::string &addr_, int fd_);
-        void event_connect_delayed (std::string &addr_, int err_);
-        void event_connect_retried (std::string &addr_, int interval_);
-        void event_listening (std::string &addr_, int fd_);
-        void event_bind_failed (std::string &addr_, int err_);
-        void event_accepted (std::string &addr_, int fd_);
-        void event_accept_failed (std::string &addr_, int err_);
-        void event_closed (std::string &addr_, int fd_);
-        void event_close_failed (std::string &addr_, int fd_);
-        void event_disconnected (std::string &addr_, int fd_);
+        //  To be called after processing commands or invoking any command
+        //  handlers explicitly. If required, it will deallocate the socket.
+        void check_destroy ();
 
     protected:
 
-        socket_base_t (zmq::ctx_t *parent_, uint32_t tid_, int sid_);
+        socket_base_t (class ctx_t *parent_, uint32_t tid_);
         virtual ~socket_base_t ();
 
         //  Concrete algorithms for the x- methods are to be defined by
         //  individual socket types.
-        virtual void xattach_pipe (zmq::pipe_t *pipe_,
-            bool icanhasall_ = false) = 0;
+        virtual void xattach_pipes (class reader_t *inpipe_,
+            class writer_t *outpipe_, const blob_t &peer_identity_) = 0;
 
         //  The default implementation assumes there are no specific socket
         //  options for the particular socket type. If not so, overload this
@@ -138,45 +123,21 @@ namespace zmq
 
         //  The default implementation assumes that send is not supported.
         virtual bool xhas_out ();
-        virtual int xsend (zmq::msg_t *msg_, int flags_);
+        virtual int xsend (zmq_msg_t *msg_, int options_);
 
         //  The default implementation assumes that recv in not supported.
         virtual bool xhas_in ();
-        virtual int xrecv (zmq::msg_t *msg_, int flags_);
+        virtual int xrecv (zmq_msg_t *msg_, int options_);
 
-        //  i_pipe_events will be forwarded to these functions.
-        virtual void xread_activated (pipe_t *pipe_);
-        virtual void xwrite_activated (pipe_t *pipe_);
-        virtual void xhiccuped (pipe_t *pipe_);
-        virtual void xterminated (pipe_t *pipe_) = 0;
+        //  We are declaring termination handler as protected so that
+        //  individual socket types can hook into the termination process
+        //  by overloading it.
+        void process_term (int linger_);
 
         //  Delay actual destruction of the socket.
         void process_destroy ();
 
-        // Socket event data dispath
-        void monitor_event (zmq_event_t data_);
-
-        // Copy monitor specific event endpoints to event messages
-        void copy_monitor_address (char *dest_, std::string &src_);
-
-        // Monitor socket cleanup
-        void stop_monitor ();
-
     private:
-        //  Creates new endpoint ID and adds the endpoint to the map.
-        void add_endpoint (const char *addr_, own_t *endpoint_);
-
-        //  Map of open endpoints.
-        typedef std::multimap <std::string, own_t *> endpoints_t;
-        endpoints_t endpoints;
-
-        //  To be called after processing commands or invoking any command
-        //  handlers explicitly. If required, it will deallocate the socket.
-        void check_destroy ();
-
-        //  Moves the flags from the message to local variables,
-        //  to be later retrieved by getsockopt.
-        void extract_flags (msg_t *msg_);
 
         //  Used to check whether the object is a socket.
         uint32_t tag;
@@ -197,26 +158,24 @@ namespace zmq
         //  bind, is available and compatible with the socket type.
         int check_protocol (const std::string &protocol_);
 
-        //  Register the pipe with this socket.
-        void attach_pipe (zmq::pipe_t *pipe_, bool icanhasall_ = false);
+        //  If no identity set generate one and call xattach_pipes ().
+        void attach_pipes (class reader_t *inpipe_, class writer_t *outpipe_,
+            const blob_t &peer_identity_);
 
-        //  Processes commands sent to this socket (if any). If timeout is -1,
-        //  returns only after at least one command was processed.
+        //  Processes commands sent to this socket (if any). If 'block' is
+        //  set to true, returns only after at least one command was processed.
         //  If throttle argument is true, commands are processed at most once
         //  in a predefined time period.
-        int process_commands (int timeout_, bool throttle_);
+        int process_commands (bool block_, bool throttle_);
 
         //  Handlers for incoming commands.
         void process_stop ();
-        void process_bind (zmq::pipe_t *pipe_);
-        void process_term (int linger_);
+        void process_bind (class reader_t *in_pipe_, class writer_t *out_pipe_,
+            const blob_t &peer_identity_);
+        void process_unplug ();
 
         //  Socket's mailbox object.
         mailbox_t mailbox;
-
-        //  List of attached pipes.
-        typedef array_t <pipe_t, 3> pipes_t;
-        pipes_t pipes;
 
         //  Reaper's poller and handle of this socket within it.
         poller_t *poller;
@@ -228,24 +187,21 @@ namespace zmq
         //  Number of messages received since last command processing.
         int ticks;
 
-        //  True if the last message received had MORE flag set.
+        //  If true there's a half-read message in the socket.
         bool rcvmore;
 
-        //  Improves efficiency of time measurement.
-        clock_t clock;
-
-        // Monitor socket;
-        void *monitor_socket;
-
-        // Bitmask of events being monitored
-        int monitor_events;
+        //  Lists of existing sessions. This list is never referenced from
+        //  within the socket, instead it is used by objects owned by
+        //  the socket. As those objects can live in different threads,
+        //  the access is synchronised by mutex.
+        typedef std::map <blob_t, session_t*> sessions_t;
+        sessions_t sessions;
+        mutex_t sessions_sync;
 
         socket_base_t (const socket_base_t&);
         const socket_base_t &operator = (const socket_base_t&);
-        mutex_t sync;
     };
 
 }
 
 #endif
-

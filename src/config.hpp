@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -27,15 +26,15 @@ namespace zmq
 
     //  Compile-time settings.
 
-    enum
+    enum 
     {
+        //  Maximum number of sockets that can be opened at the same time.
+        max_sockets = 512,
+
         //  Number of new messages in message pipe needed to trigger new memory
         //  allocation. Setting this parameter to 256 decreases the impact of
         //  memory allocation by approximately 99.6%
         message_pipe_granularity = 256,
-
-        //  Commands in pipe per allocation event.
-        command_pipe_granularity = 16,
 
         //  Determines how often does socket poll for new commands when it
         //  still has unprocessed messages to handle. Thus, if it is set to 100,
@@ -60,6 +59,10 @@ namespace zmq
         //  Maximal delta between high and low watermark.
         max_wm_delta = 1024,
 
+        //  Swap inteligently batches data for writing to disk. The size of
+        //  the batch in bytes is specified by this option.
+        swap_block_size = 8192,
+
         //  Maximum number of events the I/O thread can process in one go.
         max_io_events = 256,
 
@@ -77,11 +80,7 @@ namespace zmq
         clock_precision = 1000000,
 
         //  Maximum transport data unit size for PGM (TPDU).
-        pgm_max_tpdu = 1500,
-
-        //  On some OSes the signaler has to be emulated using a TCP
-        //  connection. In such cases following port is used.
-        signaler_port = 5905
+        pgm_max_tpdu = 1500
     };
 
 }

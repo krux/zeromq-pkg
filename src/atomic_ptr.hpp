@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -28,8 +27,6 @@
 #define ZMQ_ATOMIC_PTR_MUTEX
 #elif (defined __i386__ || defined __x86_64__) && defined __GNUC__
 #define ZMQ_ATOMIC_PTR_X86
-#elif defined __ARM_ARCH_7A__ && defined __GNUC__
-#define ZMQ_ATOMIC_PTR_ARM
 #elif defined ZMQ_HAVE_WINDOWS
 #define ZMQ_ATOMIC_PTR_WINDOWS
 #elif (defined ZMQ_HAVE_SOLARIS || defined ZMQ_HAVE_NETBSD)
@@ -89,20 +86,6 @@ namespace zmq
                 : "=r" (old), "=m" (ptr)
                 : "m" (ptr), "0" (val_));
             return old;
-#elif defined ZMQ_ATOMIC_PTR_ARM
-            T* old;
-            unsigned int flag;
-            __asm__ volatile (
-                "       dmb     sy\n\t"
-                "1:     ldrex   %1, [%3]\n\t"
-                "       strex   %0, %4, [%3]\n\t"
-                "       teq     %0, #0\n\t"
-                "       bne     1b\n\t"
-                "       dmb     sy\n\t"
-                : "=&r"(flag), "=&r"(old), "+Qo"(ptr)
-                : "r"(&ptr), "r"(val_)
-                : "cc");
-            return old;
 #elif defined ZMQ_ATOMIC_PTR_MUTEX
             sync.lock ();
             T *old = (T*) ptr;
@@ -131,23 +114,6 @@ namespace zmq
                 "lock; cmpxchg %2, %3"
                 : "=a" (old), "=m" (ptr)
                 : "r" (val_), "m" (ptr), "0" (cmp_)
-                : "cc");
-            return old;
-#elif defined ZMQ_ATOMIC_PTR_ARM
-            T *old;
-            unsigned int flag;
-            __asm__ volatile (
-                "       dmb     sy\n\t"
-                "1:     ldrex   %1, [%3]\n\t"
-                "       mov     %0, #0\n\t"
-                "       teq     %1, %4\n\t"
-                "       it      eq\n\t"
-                "       strexeq %0, %5, [%3]\n\t"
-                "       teq     %0, #0\n\t"
-                "       bne     1b\n\t"
-                "       dmb     sy\n\t"
-                : "=&r"(flag), "=&r"(old), "+Qo"(ptr)
-                : "r"(&ptr), "r"(cmp_), "r"(val_)
                 : "cc");
             return old;
 #elif defined ZMQ_ATOMIC_PTR_MUTEX
@@ -184,9 +150,6 @@ namespace zmq
 #endif
 #if defined ZMQ_ATOMIC_PTR_X86
 #undef ZMQ_ATOMIC_PTR_X86
-#endif
-#if defined ZMQ_ATOMIC_PTR_ARM
-#undef ZMQ_ATOMIC_PTR_ARM
 #endif
 #if defined ZMQ_ATOMIC_PTR_MUTEX
 #undef ZMQ_ATOMIC_PTR_MUTEX

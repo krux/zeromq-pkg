@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -23,55 +22,53 @@
 #define __ZMQ_PAIR_HPP_INCLUDED__
 
 #include "socket_base.hpp"
-#include "session_base.hpp"
+#include "pipe.hpp"
 
 namespace zmq
 {
 
-    class ctx_t;
-    class msg_t;
-    class pipe_t;
-    class io_thread_t;
-
     class pair_t :
-        public socket_base_t
+        public socket_base_t,
+        public i_reader_events,
+        public i_writer_events
     {
     public:
 
-        pair_t (zmq::ctx_t *parent_, uint32_t tid_, int sid);
+        pair_t (class ctx_t *parent_, uint32_t tid_);
         ~pair_t ();
 
         //  Overloads of functions from socket_base_t.
-        void xattach_pipe (zmq::pipe_t *pipe_, bool icanhasall_);
-        int xsend (zmq::msg_t *msg_, int flags_);
-        int xrecv (zmq::msg_t *msg_, int flags_);
+        void xattach_pipes (class reader_t *inpipe_, class writer_t *outpipe_,
+            const blob_t &peer_identity_);
+        int xsend (zmq_msg_t *msg_, int flags_);
+        int xrecv (zmq_msg_t *msg_, int flags_);
         bool xhas_in ();
         bool xhas_out ();
-        void xread_activated (zmq::pipe_t *pipe_);
-        void xwrite_activated (zmq::pipe_t *pipe_);
-        void xterminated (zmq::pipe_t *pipe_);
+
+        //  i_reader_events interface implementation.
+        void activated (class reader_t *pipe_);
+        void terminated (class reader_t *pipe_);
+        void delimited (class reader_t *pipe_);
+
+        //  i_writer_events interface implementation.
+        void activated (class writer_t *pipe_);
+        void terminated (class writer_t *pipe_);
 
     private:
 
-        zmq::pipe_t *pipe;
+        //  Hook into termination process.
+        void process_term (int linger_);
+
+        class reader_t *inpipe;
+        class writer_t *outpipe;
+
+        bool inpipe_alive;
+        bool outpipe_alive;
+
+        bool terminating;
 
         pair_t (const pair_t&);
         const pair_t &operator = (const pair_t&);
-    };
-
-    class pair_session_t : public session_base_t
-    {
-    public:
-
-        pair_session_t (zmq::io_thread_t *io_thread_, bool connect_,
-            socket_base_t *socket_, const options_t &options_,
-            const address_t *addr_);
-        ~pair_session_t ();
-
-    private:
-
-        pair_session_t (const pair_session_t&);
-        const pair_session_t &operator = (const pair_session_t&);
     };
 
 }

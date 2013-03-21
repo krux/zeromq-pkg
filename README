@@ -18,8 +18,8 @@ See the INSTALL file included with the distribution.
 Resources
 ---------
 
-Extensive documentation is provided with the distribution. Refer to
-doc/zmq.html, or "man zmq" after you have installed 0MQ on your system.
+A reference manual is provided with the distribution. Refer to "man zmq" 
+after you have installed 0MQ on your system, or see http://api.zeromq.org.
 
 Website: http://www.zeromq.org/
 

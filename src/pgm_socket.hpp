@@ -1,7 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
-    Copyright (c) 2010-2011 Miru Limited
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -29,16 +27,15 @@
 
 #ifdef ZMQ_HAVE_WINDOWS
 #include "windows.hpp"
-#define __PGM_WININT_H__
 #endif
 
+#define __PGM_WININT_H__
 #include <pgm/pgm.h>
 
 #ifdef ZMQ_HAVE_OSX
 #include <pgm/in.h>
 #endif
 
-#include "fd.hpp"
 #include "options.hpp"
 
 namespace zmq
@@ -57,17 +54,14 @@ namespace zmq
 
         //  Initialize PGM network structures (GSI, GSRs).
         int init (bool udp_encapsulation_, const char *network_);
-
-        //  Resolve PGM socket address.
-        static int init_address(const char *network_, struct pgm_addrinfo_t **addr, uint16_t *port_number);
         
         //   Get receiver fds and store them into user allocated memory.
-        void get_receiver_fds (fd_t *receive_fd_, fd_t *waiting_pipe_fd_);
+        void get_receiver_fds (int *receive_fd_, int *waiting_pipe_fd_);
 
         //   Get sender and receiver fds and store it to user allocated 
         //   memory. Receive fd is used to process NAKs from peers.
-        void get_sender_fds (fd_t *send_fd_, fd_t *receive_fd_,
-            fd_t *rdata_notify_fd_, fd_t *pending_notify_fd_);
+        void get_sender_fds (int *send_fd_, int *receive_fd_,
+            int *rdata_notify_fd_, int *pending_notify_fd_);
 
         //  Send data as one APDU, transmit window owned memory.
         size_t send (unsigned char *data_, size_t data_len_);

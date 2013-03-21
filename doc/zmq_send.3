@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: zmq_send
 .\"    Author: [see the "AUTHORS" section]
-.\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 11/23/2012
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
+.\"      Date: 05/07/2011
 .\"    Manual: 0MQ Manual
-.\"    Source: 0MQ 3.2.1
+.\"    Source: 0MQ 2.1.6
 .\"  Language: English
 .\"
-.TH "ZMQ_SEND" "3" "11/23/2012" "0MQ 3\&.2\&.1" "0MQ Manual"
+.TH "ZMQ_SEND" "3" "05/07/2011" "0MQ 2\&.1\&.6" "0MQ Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -28,15 +28,15 @@
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
 .SH "NAME"
-zmq_send \- send a message part on a socket
+zmq_send \- send a message on a socket
 .SH "SYNOPSIS"
 .sp
-\fBint zmq_send (void \fR\fB\fI*socket\fR\fR\fB, void \fR\fB\fI*buf\fR\fR\fB, size_t \fR\fB\fIlen\fR\fR\fB, int \fR\fB\fIflags\fR\fR\fB);\fR
+\fBint zmq_send (void \fR\fB\fI*socket\fR\fR\fB, zmq_msg_t \fR\fB\fI*msg\fR\fR\fB, int \fR\fB\fIflags\fR\fR\fB);\fR
 .SH "DESCRIPTION"
 .sp
-The \fIzmq_send()\fR function shall queue a message created from the buffer referenced by the \fIbuf\fR and \fIlen\fR arguments\&. The \fIflags\fR argument is a combination of the flags defined below:
+The \fIzmq_send()\fR function shall queue the message referenced by the \fImsg\fR argument to be sent to the socket referenced by the \fIsocket\fR argument\&. The \fIflags\fR argument is a combination of the flags defined below:
 .PP
-\fBZMQ_DONTWAIT\fR
+\fBZMQ_NOBLOCK\fR
 .RS 4
 Specifies that the operation should be performed in non\-blocking mode\&. If the message cannot be queued on the
 \fIsocket\fR, the
@@ -50,6 +50,8 @@ set to EAGAIN\&.
 .RS 4
 Specifies that the message being sent is a multi\-part message, and that further message parts are to follow\&. Refer to the section regarding multi\-part messages below for a detailed description\&.
 .RE
+.sp
+The \fIzmq_msg_t\fR structure passed to \fIzmq_send()\fR is nullified during the call\&. If you want to send the same message to multiple sockets you have to copy it using (e\&.g\&. using \fIzmq_msg_copy()\fR)\&.
 .if n \{\
 .sp
 .\}
@@ -68,12 +70,14 @@ A successful invocation of \fIzmq_send()\fR does not indicate that the message h
 .RE
 .SS "Multi\-part messages"
 .sp
-A 0MQ message is composed of 1 or more message parts\&. 0MQ ensures atomic delivery of messages: peers shall receive either all \fImessage parts\fR of a message or none at all\&. The total number of message parts is unlimited except by available memory\&.
+A 0MQ message is composed of 1 or more message parts; each message part is an independent \fIzmq_msg_t\fR in its own right\&. 0MQ ensures atomic delivery of messages; peers shall receive either all \fImessage parts\fR of a message or none at all\&.
 .sp
-An application that sends multi\-part messages must use the \fIZMQ_SNDMORE\fR flag when sending each message part except the final one\&.
+The total number of message parts is unlimited\&.
+.sp
+An application wishing to send a multi\-part message does so by specifying the \fIZMQ_SNDMORE\fR flag to \fIzmq_send()\fR\&. The presence of this flag indicates to 0MQ that the message being sent is a multi\-part message and that more message parts are to follow\&. When the application wishes to send the final message part it does so by calling \fIzmq_send()\fR without the \fIZMQ_SNDMORE\fR flag; this indicates that no more message parts are to follow\&.
 .SH "RETURN VALUE"
 .sp
-The \fIzmq_send()\fR function shall return number of bytes in the message if successful\&. Otherwise it shall return \-1 and set \fIerrno\fR to one of the values defined below\&.
+The \fIzmq_send()\fR function shall return zero if successful\&. Otherwise it shall return \-1 and set \fIerrno\fR to one of the values defined below\&.
 .SH "ERRORS"
 .PP
 \fBEAGAIN\fR
@@ -119,7 +123,32 @@ was invalid\&.
 .RS 4
 The operation was interrupted by delivery of a signal before the message was sent\&.
 .RE
+.PP
+\fBEFAULT\fR
+.RS 4
+Invalid message\&.
+.RE
 .SH "EXAMPLE"
+.PP
+\fBFilling in a message and sending it to a socket\fR. 
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+/* Create a new message, allocating 6 bytes for message content */
+zmq_msg_t msg;
+int rc = zmq_msg_init_size (&msg, 6);
+assert (rc == 0);
+/* Fill in message content with \*(AqAAAAAA\*(Aq */
+memset (zmq_msg_data (&msg), \*(AqA\*(Aq, 6);
+/* Send the message to the socket */
+rc = zmq_send (socket, &msg, 0);
+assert (rc == 0);
+.fi
+.if n \{\
+.RE
+.\}
 .PP
 \fBSending a multi-part message\fR. 
 .sp
@@ -128,13 +157,10 @@ The operation was interrupted by delivery of a signal before the message was sen
 .\}
 .nf
 /* Send a multi\-part message consisting of three parts to socket */
-rc = zmq_send (socket, "ABC", 3, ZMQ_SNDMORE);
-assert (rc == 3);
-rc = zmq_send (socket, "DEFGH", 5, ZMQ_SNDMORE);
-assert (rc == 5);
+rc = zmq_send (socket, &part1, ZMQ_SNDMORE);
+rc = zmq_send (socket, &part2, ZMQ_SNDMORE);
 /* Final part; no more parts to follow */
-rc = zmq_send (socket, "JK", 2, 0);
-assert (rc == 2);
+rc = zmq_send (socket, &part3, 0);
 .fi
 .if n \{\
 .RE
@@ -142,10 +168,10 @@ assert (rc == 2);
 .sp
 .SH "SEE ALSO"
 .sp
-\fBzmq_sendmsg\fR(3) \fBzmq_recv\fR(3) \fBzmq_recvmsg\fR(3) \fBzmq_socket\fR(7) \fBzmq\fR(7)
+\fBzmq_recv\fR(3) \fBzmq_socket\fR(7) \fBzmq\fR(7)
 .SH "AUTHORS"
 .sp
-This 0MQ manual page was written by Martin Sustrik <\m[blue]\fBsustrik@250bpm\&.com\fR\m[]\&\s-2\u[1]\d\s+2> and Martin Lucina <\m[blue]\fBmato@kotelna\&.sk\fR\m[]\&\s-2\u[2]\d\s+2>, and Pieter Hintjens <\m[blue]\fBph@imatix\&.com\fR\m[]\&\s-2\u[3]\d\s+2>\&.
+This 0MQ manual page was written by Martin Sustrik <\m[blue]\fBsustrik@250bpm\&.com\fR\m[]\&\s-2\u[1]\d\s+2> and Martin Lucina <\m[blue]\fBmato@kotelna\&.sk\fR\m[]\&\s-2\u[2]\d\s+2>\&.
 .SH "NOTES"
 .IP " 1." 4
 sustrik@250bpm.com
@@ -156,9 +182,4 @@ sustrik@250bpm.com
 mato@kotelna.sk
 .RS 4
 \%mailto:mato@kotelna.sk
-.RE
-.IP " 3." 4
-ph@imatix.com
-.RS 4
-\%mailto:ph@imatix.com
 .RE

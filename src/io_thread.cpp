@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -20,6 +19,8 @@
 */
 
 #include <new>
+
+#include "../include/zmq.h"
 
 #include "io_thread.hpp"
 #include "platform.hpp"
@@ -67,16 +68,20 @@ void zmq::io_thread_t::in_event ()
     //  TODO: Do we want to limit number of commands I/O thread can
     //  process in a single go?
 
-    command_t cmd;
-    int rc = mailbox.recv (&cmd, 0);
+    while (true) {
 
-    while (rc == 0 || errno == EINTR) {
-        if (rc == 0)
-            cmd.destination->process_command (cmd);
-        rc = mailbox.recv (&cmd, 0);
+        //  Get the next command. If there is none, exit.
+        command_t cmd;
+        int rc = mailbox.recv (&cmd, false);
+        if (rc != 0 && errno == EINTR)
+            continue;
+        if (rc != 0 && errno == EAGAIN)
+            break;
+        errno_assert (rc == 0);
+
+        //  Process the command.
+        cmd.destination->process_command (cmd);
     }
-
-    errno_assert (rc != 0 && errno == EAGAIN);
 }
 
 void zmq::io_thread_t::out_event ()
@@ -85,7 +90,7 @@ void zmq::io_thread_t::out_event ()
     zmq_assert (false);
 }
 
-void zmq::io_thread_t::timer_event (int)
+void zmq::io_thread_t::timer_event (int id_)
 {
     //  No timers here. This function is never called.
     zmq_assert (false);

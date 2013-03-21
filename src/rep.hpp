@@ -1,5 +1,4 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
     Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
@@ -22,26 +21,21 @@
 #ifndef __ZMQ_REP_HPP_INCLUDED__
 #define __ZMQ_REP_HPP_INCLUDED__
 
-#include "router.hpp"
+#include "xrep.hpp"
 
 namespace zmq
 {
 
-    class ctx_t;
-    class msg_t;
-    class io_thread_t;
-    class socket_base_t;
-
-    class rep_t : public router_t
+    class rep_t : public xrep_t
     {
     public:
 
-        rep_t (zmq::ctx_t *parent_, uint32_t tid_, int sid);
+        rep_t (class ctx_t *parent_, uint32_t tid_);
         ~rep_t ();
 
         //  Overloads of functions from socket_base_t.
-        int xsend (zmq::msg_t *msg_, int flags_);
-        int xrecv (zmq::msg_t *msg_, int flags_);
+        int xsend (zmq_msg_t *msg_, int flags_);
+        int xrecv (zmq_msg_t *msg_, int flags_);
         bool xhas_in ();
         bool xhas_out ();
 
@@ -58,21 +52,6 @@ namespace zmq
         rep_t (const rep_t&);
         const rep_t &operator = (const rep_t&);
 
-    };
-
-    class rep_session_t : public router_session_t
-    {
-    public:
-
-        rep_session_t (zmq::io_thread_t *io_thread_, bool connect_,
-            zmq::socket_base_t *socket_, const options_t &options_,
-            const address_t *addr_);
-        ~rep_session_t ();
-
-    private:
-
-        rep_session_t (const rep_session_t&);
-        const rep_session_t &operator = (const rep_session_t&);
     };
 
 }

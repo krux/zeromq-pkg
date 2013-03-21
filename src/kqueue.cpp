@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -19,8 +18,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "kqueue.hpp"
-#if defined ZMQ_USE_KQUEUE
+#include "platform.hpp"
+
+#if defined ZMQ_HAVE_FREEBSD || defined ZMQ_HAVE_OPENBSD ||\
+    defined ZMQ_HAVE_OSX || defined ZMQ_HAVE_NETBSD
 
 #include <sys/time.h>
 #include <sys/types.h>
@@ -34,7 +35,6 @@
 #include "err.hpp"
 #include "config.hpp"
 #include "i_poll_events.hpp"
-#include "likely.hpp"
 
 //  NetBSD defines (struct kevent).udata as intptr_t, everyone else
 //  as void *.
@@ -108,37 +108,29 @@ void zmq::kqueue_t::rm_fd (handle_t handle_)
 void zmq::kqueue_t::set_pollin (handle_t handle_)
 {
     poll_entry_t *pe = (poll_entry_t*) handle_;
-    if (likely (!pe->flag_pollin)) {
-        pe->flag_pollin = true;
-        kevent_add (pe->fd, EVFILT_READ, pe);
-    }
+    pe->flag_pollin = true;
+    kevent_add (pe->fd, EVFILT_READ, pe);
 }
 
 void zmq::kqueue_t::reset_pollin (handle_t handle_)
 {
     poll_entry_t *pe = (poll_entry_t*) handle_;
-    if (likely (pe->flag_pollin)) {
-        pe->flag_pollin = false;
-        kevent_delete (pe->fd, EVFILT_READ);
-    }
+    pe->flag_pollin = false;
+    kevent_delete (pe->fd, EVFILT_READ);
 }
 
 void zmq::kqueue_t::set_pollout (handle_t handle_)
 {
     poll_entry_t *pe = (poll_entry_t*) handle_;
-    if (likely (!pe->flag_pollout)) {
-        pe->flag_pollout = true;
-        kevent_add (pe->fd, EVFILT_WRITE, pe);
-    }
+    pe->flag_pollout = true;
+    kevent_add (pe->fd, EVFILT_WRITE, pe);
 }
 
 void zmq::kqueue_t::reset_pollout (handle_t handle_)
 {
     poll_entry_t *pe = (poll_entry_t*) handle_;
-    if (likely (pe->flag_pollout)) {
-        pe->flag_pollout = false;
-        kevent_delete (pe->fd, EVFILT_WRITE);
-   }
+    pe->flag_pollout = false;
+    kevent_delete (pe->fd, EVFILT_WRITE);
 }
 
 void zmq::kqueue_t::start ()
@@ -163,10 +155,9 @@ void zmq::kqueue_t::loop ()
         timespec ts = {timeout / 1000, (timeout % 1000) * 1000000};
         int n = kevent (kqueue_fd, NULL, 0, &ev_buf [0], max_io_events,
             timeout ? &ts: NULL);
-        if (n == -1) {
-            errno_assert (errno == EINTR);
+        if (n == -1 && errno == EINTR)
             continue;
-        }
+        errno_assert (n != -1);
 
         for (int i = 0; i < n; i ++) {
             poll_entry_t *pe = (poll_entry_t*) ev_buf [i].udata;
@@ -198,4 +189,6 @@ void zmq::kqueue_t::worker_routine (void *arg_)
     ((kqueue_t*) arg_)->loop ();
 }
 
+//  Don't pollute namespace with defines local to this file
+#undef kevent_udata_t
 #endif

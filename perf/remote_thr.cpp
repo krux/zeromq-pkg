@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -51,7 +50,7 @@ int main (int argc, char *argv [])
         return -1;
     }
 
-    s = zmq_socket (ctx, ZMQ_PUSH);
+    s = zmq_socket (ctx, ZMQ_PUB);
     if (!s) {
         printf ("error in zmq_socket: %s\n", zmq_strerror (errno));
         return -1;
@@ -77,9 +76,9 @@ int main (int argc, char *argv [])
         memset (zmq_msg_data (&msg), 0, message_size);
 #endif
 
-        rc = zmq_sendmsg (s, &msg, 0);
-        if (rc < 0) {
-            printf ("error in zmq_sendmsg: %s\n", zmq_strerror (errno));
+        rc = zmq_send (s, &msg, 0);
+        if (rc != 0) {
+            printf ("error in zmq_send: %s\n", zmq_strerror (errno));
             return -1;
         }
         rc = zmq_msg_close (&msg);

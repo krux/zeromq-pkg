@@ -1,7 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
-    Copyright (c) 2011 VMware, Inc.
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -20,15 +18,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "../include/zmq.h"
+
 #include "req.hpp"
 #include "err.hpp"
-#include "msg.hpp"
-#include "wire.hpp"
-#include "random.hpp"
-#include "likely.hpp"
 
-zmq::req_t::req_t (class ctx_t *parent_, uint32_t tid_, int sid_) :
-    dealer_t (parent_, tid_, sid_),
+zmq::req_t::req_t (class ctx_t *parent_, uint32_t tid_) :
+    xreq_t (parent_, tid_),
     receiving_reply (false),
     message_begins (true)
 {
@@ -39,7 +35,7 @@ zmq::req_t::~req_t ()
 {
 }
 
-int zmq::req_t::xsend (msg_t *msg_, int flags_)
+int zmq::req_t::xsend (zmq_msg_t *msg_, int flags_)
 {
     //  If we've sent a request and we still haven't got the reply,
     //  we can't send another request.
@@ -48,21 +44,21 @@ int zmq::req_t::xsend (msg_t *msg_, int flags_)
         return -1;
     }
 
-    //  First part of the request is the request identity.
+    //  First part of the request is empty message part (stack bottom).
     if (message_begins) {
-        msg_t bottom;
-        int rc = bottom.init ();
-        errno_assert (rc == 0);
-        bottom.set_flags (msg_t::more);
-        rc = dealer_t::xsend (&bottom, 0);
+        zmq_msg_t prefix;
+        int rc = zmq_msg_init (&prefix);
+        zmq_assert (rc == 0);
+        prefix.flags |= ZMQ_MSG_MORE;
+        rc = xreq_t::xsend (&prefix, flags_);
         if (rc != 0)
-            return -1;
+            return rc;
         message_begins = false;
     }
 
-    bool more = msg_->flags () & msg_t::more ? true : false;
+    bool more = msg_->flags & ZMQ_MSG_MORE;
 
-    int rc = dealer_t::xsend (msg_, flags_);
+    int rc = xreq_t::xsend (msg_, flags_);
     if (rc != 0)
         return rc;
 
@@ -75,7 +71,7 @@ int zmq::req_t::xsend (msg_t *msg_, int flags_)
     return 0;
 }
 
-int zmq::req_t::xrecv (msg_t *msg_, int flags_)
+int zmq::req_t::xrecv (zmq_msg_t *msg_, int flags_)
 {
     //  If request wasn't send, we can't wait for reply.
     if (!receiving_reply) {
@@ -83,35 +79,22 @@ int zmq::req_t::xrecv (msg_t *msg_, int flags_)
         return -1;
     }
 
-    //  First part of the reply should be the original request ID.
+    //  First part of the reply should be empty message part (stack bottom).
     if (message_begins) {
-        int rc = dealer_t::xrecv (msg_, flags_);
+        int rc = xreq_t::xrecv (msg_, flags_);
         if (rc != 0)
             return rc;
-
-        // TODO: This should also close the connection with the peer!
-        if (unlikely (!(msg_->flags () & msg_t::more) || msg_->size () != 0)) {
-            while (true) {
-                int rc = dealer_t::xrecv (msg_, flags_);
-                errno_assert (rc == 0);
-                if (!(msg_->flags () & msg_t::more))
-                    break;
-            }
-            msg_->close ();
-            msg_->init ();
-            errno = EAGAIN;
-            return -1;
-        }
-
+        zmq_assert (msg_->flags & ZMQ_MSG_MORE);
+        zmq_assert (zmq_msg_size (msg_) == 0);
         message_begins = false;
     }
 
-    int rc = dealer_t::xrecv (msg_, flags_);
+    int rc = xreq_t::xrecv (msg_, flags_);
     if (rc != 0)
         return rc;
 
     //  If the reply is fully received, flip the FSM into request-sending state.
-    if (!(msg_->flags () & msg_t::more)) {
+    if (!(msg_->flags & ZMQ_MSG_MORE)) {
         receiving_reply = false;
         message_begins = true;
     }
@@ -121,12 +104,10 @@ int zmq::req_t::xrecv (msg_t *msg_, int flags_)
 
 bool zmq::req_t::xhas_in ()
 {
-    //  TODO: Duplicates should be removed here.
-
     if (!receiving_reply)
         return false;
 
-    return dealer_t::xhas_in ();
+    return xreq_t::xhas_in ();
 }
 
 bool zmq::req_t::xhas_out ()
@@ -134,52 +115,7 @@ bool zmq::req_t::xhas_out ()
     if (receiving_reply)
         return false;
 
-    return dealer_t::xhas_out ();
+    return xreq_t::xhas_out ();
 }
 
-zmq::req_session_t::req_session_t (io_thread_t *io_thread_, bool connect_,
-      socket_base_t *socket_, const options_t &options_,
-      const address_t *addr_) :
-    dealer_session_t (io_thread_, connect_, socket_, options_, addr_),
-    state (identity)
-{
-}
 
-zmq::req_session_t::~req_session_t ()
-{
-    state = options.recv_identity ? identity : bottom;
-}
-
-int zmq::req_session_t::push_msg (msg_t *msg_)
-{
-    switch (state) {
-    case bottom:
-        if (msg_->flags () == msg_t::more && msg_->size () == 0) {
-            state = body;
-            return dealer_session_t::push_msg (msg_);
-        }
-        break;
-    case body:
-        if (msg_->flags () == msg_t::more)
-            return dealer_session_t::push_msg (msg_);
-        if (msg_->flags () == 0) {
-            state = bottom;
-            return dealer_session_t::push_msg (msg_);
-        }
-        break;
-    case identity:
-        if (msg_->flags () == 0) {
-            state = bottom;
-            return dealer_session_t::push_msg (msg_);
-        }
-        break;
-    }
-    errno = EFAULT;
-    return -1;
-}
-
-void zmq::req_session_t::reset ()
-{
-    session_base_t::reset ();
-    state = identity;
-}

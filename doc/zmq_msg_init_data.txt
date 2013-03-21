@@ -44,9 +44,7 @@ it shall return `-1` and set 'errno' to one of the values defined below.
 
 ERRORS
 ------
-*ENOMEM*::
-Insufficient storage space is available.
-
+No errors are defined.
 
 
 EXAMPLE

@@ -1,6 +1,6 @@
 /*
-    Copyright (c) 2010-2011 250bpm s.r.o.
-    Copyright (c) 2010-2011 Other contributors as noted in the AUTHORS file
+    Copyright (c) 2007-2011 iMatix Corporation
+    Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
 
@@ -21,55 +21,42 @@
 #ifndef __ZMQ_XSUB_HPP_INCLUDED__
 #define __ZMQ_XSUB_HPP_INCLUDED__
 
-#include "socket_base.hpp"
-#include "session_base.hpp"
-#include "dist.hpp"
-#include "fq.hpp"
+#include "../include/zmq.h"
+
 #include "trie.hpp"
+#include "socket_base.hpp"
+#include "fq.hpp"
 
 namespace zmq
 {
 
-    class ctx_t;
-    class pipe_t;
-    class io_thread_t;
-
-    class xsub_t :
-        public socket_base_t
+    class xsub_t : public socket_base_t
     {
     public:
 
-        xsub_t (zmq::ctx_t *parent_, uint32_t tid_, int sid_);
+        xsub_t (class ctx_t *parent_, uint32_t tid_);
         ~xsub_t ();
 
     protected:
 
         //  Overloads of functions from socket_base_t.
-        void xattach_pipe (zmq::pipe_t *pipe_, bool icanhasall_);
-        int xsend (zmq::msg_t *msg_, int flags_);
+        void xattach_pipes (class reader_t *inpipe_, class writer_t *outpipe_,
+            const blob_t &peer_identity_);
+        int xsend (zmq_msg_t *msg_, int options_);
         bool xhas_out ();
-        int xrecv (zmq::msg_t *msg_, int flags_);
+        int xrecv (zmq_msg_t *msg_, int flags_);
         bool xhas_in ();
-        void xread_activated (zmq::pipe_t *pipe_);
-        void xwrite_activated (zmq::pipe_t *pipe_);
-        void xhiccuped (pipe_t *pipe_);
-        void xterminated (zmq::pipe_t *pipe_);
 
     private:
 
-        //  Check whether the message matches at least one subscription.
-        bool match (zmq::msg_t *msg_);
+        //  Hook into the termination process.
+        void process_term (int linger_);
 
-        //  Function to be applied to the trie to send all the subsciptions
-        //  upstream.
-        static void send_subscription (unsigned char *data_, size_t size_,
-            void *arg_);
+        //  Check whether the message matches at least one subscription.
+        bool match (zmq_msg_t *msg_);
 
         //  Fair queueing object for inbound pipes.
         fq_t fq;
-
-        //  Object for distributing the subscriptions upstream.
-        dist_t dist;
 
         //  The repository of subscriptions.
         trie_t subscriptions;
@@ -77,7 +64,7 @@ namespace zmq
         //  If true, 'message' contains a matching message to return on the
         //  next recv call.
         bool has_message;
-        msg_t message;
+        zmq_msg_t message;
 
         //  If true, part of a multipart message was already received, but
         //  there are following parts still waiting.
@@ -85,21 +72,6 @@ namespace zmq
 
         xsub_t (const xsub_t&);
         const xsub_t &operator = (const xsub_t&);
-    };
-
-    class xsub_session_t : public session_base_t
-    {
-    public:
-
-        xsub_session_t (class io_thread_t *io_thread_, bool connect_,
-            socket_base_t *socket_, const options_t &options_,
-            const address_t *addr_);
-        ~xsub_session_t ();
-
-    private:
-
-        xsub_session_t (const xsub_session_t&);
-        const xsub_session_t &operator = (const xsub_session_t&);
     };
 
 }

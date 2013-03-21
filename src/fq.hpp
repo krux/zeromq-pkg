@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -24,34 +23,35 @@
 
 #include "array.hpp"
 #include "pipe.hpp"
-#include "msg.hpp"
 
 namespace zmq
 {
 
     //  Class manages a set of inbound pipes. On receive it performs fair
-    //  queueing so that senders gone berserk won't cause denial of
+    //  queueing (RFC970) so that senders gone berserk won't cause denial of
     //  service for decent senders.
-
-    class fq_t
+    class fq_t : public i_reader_events
     {
     public:
 
-        fq_t ();
+        fq_t (class own_t *sink_);
         ~fq_t ();
 
-        void attach (pipe_t *pipe_);
-        void activated (pipe_t *pipe_);
-        void terminated (pipe_t *pipe_);
+        void attach (reader_t *pipe_);
+        void terminate ();
 
-        int recv (msg_t *msg_);
-        int recvpipe (msg_t *msg_, pipe_t **pipe_);
+        int recv (zmq_msg_t *msg_, int flags_);
         bool has_in ();
+
+        //  i_reader_events implementation.
+        void activated (reader_t *pipe_);
+        void terminated (reader_t *pipe_);
+        void delimited (reader_t *pipe_);
 
     private:
 
         //  Inbound pipes.
-        typedef array_t <pipe_t, 1> pipes_t;
+        typedef array_t <reader_t> pipes_t;
         pipes_t pipes;
 
         //  Number of active pipes. All the active pipes are located at the
@@ -64,6 +64,12 @@ namespace zmq
         //  If true, part of a multipart message was already received, but
         //  there are following parts still waiting in the current pipe.
         bool more;
+
+        //  Object to send events to.
+        class own_t *sink;
+
+        //  If true, termination process is already underway.
+        bool terminating;
 
         fq_t (const fq_t&);
         const fq_t &operator = (const fq_t&);

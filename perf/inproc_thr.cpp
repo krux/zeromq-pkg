@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2007-2012 iMatix Corporation
-    Copyright (c) 2009-2011 250bpm s.r.o.
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -49,7 +48,7 @@ static void *worker (void *ctx_)
     int i;
     zmq_msg_t msg;
 
-    s = zmq_socket (ctx_, ZMQ_PUSH);
+    s = zmq_socket (ctx_, ZMQ_PUB);
     if (!s) {
         printf ("error in zmq_socket: %s\n", zmq_strerror (errno));
         exit (1);
@@ -72,9 +71,9 @@ static void *worker (void *ctx_)
         memset (zmq_msg_data (&msg), 0, message_size);
 #endif
 
-        rc = zmq_sendmsg (s, &msg, 0);
+        rc = zmq_send (s, &msg, 0);
         if (rc < 0) {
-            printf ("error in zmq_sendmsg: %s\n", zmq_strerror (errno));
+            printf ("error in zmq_send: %s\n", zmq_strerror (errno));
             exit (1);
         }
         rc = zmq_msg_close (&msg);
@@ -128,9 +127,15 @@ int main (int argc, char *argv [])
         return -1;
     }
 
-    s = zmq_socket (ctx, ZMQ_PULL);
+    s = zmq_socket (ctx, ZMQ_SUB);
     if (!s) {
         printf ("error in zmq_socket: %s\n", zmq_strerror (errno));
+        return -1;
+    }
+
+    rc = zmq_setsockopt (s, ZMQ_SUBSCRIBE , "", 0);
+    if (rc != 0) {
+        printf ("error in zmq_setsockopt: %s\n", zmq_strerror (errno));
         return -1;
     }
 
@@ -164,9 +169,9 @@ int main (int argc, char *argv [])
     printf ("message size: %d [B]\n", (int) message_size);
     printf ("message count: %d\n", (int) message_count);
 
-    rc = zmq_recvmsg (s, &msg, 0);
+    rc = zmq_recv (s, &msg, 0);
     if (rc < 0) {
-        printf ("error in zmq_recvmsg: %s\n", zmq_strerror (errno));
+        printf ("error in zmq_recv: %s\n", zmq_strerror (errno));
         return -1;
     }
     if (zmq_msg_size (&msg) != message_size) {
@@ -177,9 +182,9 @@ int main (int argc, char *argv [])
     watch = zmq_stopwatch_start ();
 
     for (i = 0; i != message_count - 1; i++) {
-        rc = zmq_recvmsg (s, &msg, 0);
+        rc = zmq_recv (s, &msg, 0);
         if (rc < 0) {
-            printf ("error in zmq_recvmsg: %s\n", zmq_strerror (errno));
+            printf ("error in zmq_recv: %s\n", zmq_strerror (errno));
             return -1;
         }
         if (zmq_msg_size (&msg) != message_size) {

@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2010 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -23,35 +22,30 @@
 #define __ZMQ_PULL_HPP_INCLUDED__
 
 #include "socket_base.hpp"
-#include "session_base.hpp"
 #include "fq.hpp"
 
 namespace zmq
 {
 
-    class ctx_t;
-    class pipe_t;
-    class msg_t;
-    class io_thread_t;
-
-    class pull_t :
-        public socket_base_t
+    class pull_t : public socket_base_t
     {
     public:
 
-        pull_t (zmq::ctx_t *parent_, uint32_t tid_, int sid_);
+        pull_t (class ctx_t *parent_, uint32_t tid_);
         ~pull_t ();
 
     protected:
 
         //  Overloads of functions from socket_base_t.
-        void xattach_pipe (zmq::pipe_t *pipe_, bool icanhasall_);
-        int xrecv (zmq::msg_t *msg_, int flags_);
+        void xattach_pipes (class reader_t *inpipe_, class writer_t *outpipe_,
+            const blob_t &peer_identity_);
+        int xrecv (zmq_msg_t *msg_, int flags_);
         bool xhas_in ();
-        void xread_activated (zmq::pipe_t *pipe_);
-        void xterminated (zmq::pipe_t *pipe_);
 
     private:
+
+        //  Hook into the termination process.
+        void process_term (int linger_);
 
         //  Fair queueing object for inbound pipes.
         fq_t fq;
@@ -59,21 +53,6 @@ namespace zmq
         pull_t (const pull_t&);
         const pull_t &operator = (const pull_t&);
 
-    };
-
-    class pull_session_t : public session_base_t
-    {
-    public:
-
-        pull_session_t (zmq::io_thread_t *io_thread_, bool connect_,
-            socket_base_t *socket_, const options_t &options_,
-            const address_t *addr_);
-        ~pull_session_t ();
-
-    private:
-
-        pull_session_t (const pull_session_t&);
-        const pull_session_t &operator = (const pull_session_t&);
     };
 
 }

@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -22,9 +21,9 @@
 #ifndef __ZMQ_DEVPOLL_HPP_INCLUDED__
 #define __ZMQ_DEVPOLL_HPP_INCLUDED__
 
-//  poller.hpp decides which polling mechanism to use.
-#include "poller.hpp"
-#if defined ZMQ_USE_DEVPOLL
+#include "platform.hpp"
+
+#if defined ZMQ_HAVE_SOLARIS || defined ZMQ_HAVE_HPUX
 
 #include <vector>
 
@@ -34,8 +33,6 @@
 
 namespace zmq
 {
-
-    struct i_poll_events;
 
     //  Implements socket polling mechanism using the "/dev/poll" interface.
 
@@ -49,7 +46,7 @@ namespace zmq
         ~devpoll_t ();
 
         //  "poller" concept.
-        handle_t add_fd (fd_t fd_, zmq::i_poll_events *events_);
+        handle_t add_fd (fd_t fd_, struct i_poll_events *events_);
         void rm_fd (handle_t handle_);
         void set_pollin (handle_t handle_);
         void reset_pollin (handle_t handle_);
@@ -72,7 +69,7 @@ namespace zmq
         struct fd_entry_t
         {
             short events;
-            zmq::i_poll_events *reactor;
+            struct i_poll_events *reactor;
             bool valid;
             bool accepted;
         };
@@ -95,8 +92,6 @@ namespace zmq
         devpoll_t (const devpoll_t&);
         const devpoll_t &operator = (const devpoll_t&);
     };
-
-    typedef devpoll_t poller_t;
 
 }
 

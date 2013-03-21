@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -25,17 +24,16 @@
 namespace zmq
 {
 
-    class io_thread_t;
-
-    //  Abstract interface to be implemented by various engines.
-
     struct i_engine
     {
         virtual ~i_engine () {}
 
         //  Plug the engine to the session.
-        virtual void plug (zmq::io_thread_t *io_thread_,
-            class session_base_t *session_) = 0;
+        virtual void plug (class io_thread_t *io_thread_,
+            struct i_inout *inout_) = 0;
+
+        //  Unplug the engine from the session.
+        virtual void unplug () = 0;
 
         //  Terminate and deallocate the engine. Note that 'detached'
         //  events are not fired on termination.

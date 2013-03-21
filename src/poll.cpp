@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -19,8 +18,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "poll.hpp"
-#if defined ZMQ_USE_POLL
+#include "platform.hpp"
+
+#if defined ZMQ_HAVE_LINUX || defined ZMQ_HAVE_FREEBSD ||\
+    defined ZMQ_HAVE_OPENBSD || defined ZMQ_HAVE_SOLARIS ||\
+    defined ZMQ_HAVE_OSX || defined ZMQ_HAVE_QNXNTO ||\
+    defined ZMQ_HAVE_HPUX || defined ZMQ_HAVE_AIX ||\
+    defined ZMQ_HAVE_NETBSD
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -57,7 +61,7 @@ zmq::poll_t::handle_t zmq::poll_t::add_fd (fd_t fd_, i_poll_events *events_)
 
     pollfd pfd = {fd_, 0, 0};
     pollset.push_back (pfd);
-    zmq_assert (fd_table [fd_].index == retired_fd);
+    assert (fd_table [fd_].index == retired_fd);
 
     fd_table [fd_].index = pollset.size() - 1;
     fd_table [fd_].events = events_;
@@ -71,7 +75,7 @@ zmq::poll_t::handle_t zmq::poll_t::add_fd (fd_t fd_, i_poll_events *events_)
 void zmq::poll_t::rm_fd (handle_t handle_)
 {
     fd_t index = fd_table [handle_].index;
-    zmq_assert (index != retired_fd);
+    assert (index != retired_fd);
 
     //  Mark the fd as unused.
     pollset [index].fd = retired_fd;
@@ -125,10 +129,10 @@ void zmq::poll_t::loop ()
 
         //  Wait for events.
         int rc = poll (&pollset [0], pollset.size (), timeout ? timeout : -1);
-        if (rc == -1) {
-            errno_assert (errno == EINTR);
+        if (rc == -1 && errno == EINTR)
             continue;
-        }
+        errno_assert (rc != -1);
+
 
         //  If there are no events (i.e. it's a timeout) there's no point
         //  in checking the pollset.

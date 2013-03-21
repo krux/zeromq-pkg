@@ -1,5 +1,4 @@
 /*
-    Copyright (c) 2010-2011 250bpm s.r.o.
     Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
@@ -27,11 +26,7 @@
 
 extern "C"
 {
-#if defined _WIN32_WCE
-	static DWORD thread_routine (LPVOID arg_)
-#else
     static unsigned int __stdcall thread_routine (void *arg_)
-#endif
     {
         zmq::thread_t *self = (zmq::thread_t*) arg_;
         self->tfn (self->arg);
@@ -43,13 +38,8 @@ void zmq::thread_t::start (thread_fn *tfn_, void *arg_)
 {
     tfn = tfn_;
     arg =arg_;
-#if defined WINCE
-    descriptor = (HANDLE) CreateThread (NULL, 0,
-        &::thread_routine, this, 0 , NULL);
-#else
     descriptor = (HANDLE) _beginthreadex (NULL, 0,
         &::thread_routine, this, 0 , NULL);
-#endif
     win_assert (descriptor != NULL);    
 }
 
@@ -69,15 +59,15 @@ extern "C"
 {
     static void *thread_routine (void *arg_)
     {
-#if !defined ZMQ_HAVE_OPENVMS && !defined ZMQ_HAVE_ANDROID
-        //  Following code will guarantee more predictable latencies as it'll
+    #if !defined ZMQ_HAVE_OPENVMS
+        //  Following code will guarantee more predictable latecnies as it'll
         //  disallow any signal handling in the I/O thread.
         sigset_t signal_set;
         int rc = sigfillset (&signal_set);
         errno_assert (rc == 0);
         rc = pthread_sigmask (SIG_BLOCK, &signal_set, NULL);
-        posix_assert (rc);
-#endif
+        errno_assert (rc == 0);
+    #endif
 
         zmq::thread_t *self = (zmq::thread_t*) arg_;   
         self->tfn (self->arg);
@@ -90,13 +80,13 @@ void zmq::thread_t::start (thread_fn *tfn_, void *arg_)
     tfn = tfn_;
     arg =arg_;
     int rc = pthread_create (&descriptor, NULL, thread_routine, this);
-    posix_assert (rc);
+    errno_assert (rc == 0);
 }
 
 void zmq::thread_t::stop ()
 {
     int rc = pthread_join (descriptor, NULL);
-    posix_assert (rc);
+    errno_assert (rc == 0);
 }
 
 #endif

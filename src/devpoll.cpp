@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -19,8 +18,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "devpoll.hpp"
-#if defined ZMQ_USE_DEVPOLL
+#include "platform.hpp"
+
+#if defined ZMQ_HAVE_SOLARIS || defined ZMQ_HAVE_HPUX
 
 #include <sys/devpoll.h>
 #include <sys/time.h>
@@ -70,7 +70,7 @@ zmq::devpoll_t::handle_t zmq::devpoll_t::add_fd (fd_t fd_,
         }
     }
 
-    zmq_assert (!fd_table [fd_].valid);
+    assert (!fd_table [fd_].valid);
 
     fd_table [fd_].events = 0;
     fd_table [fd_].reactor = reactor_;
@@ -88,7 +88,7 @@ zmq::devpoll_t::handle_t zmq::devpoll_t::add_fd (fd_t fd_,
 
 void zmq::devpoll_t::rm_fd (handle_t handle_)
 {
-    zmq_assert (fd_table [handle_].valid);
+    assert (fd_table [handle_].valid);
 
     devpoll_ctl (handle_, POLLREMOVE);
     fd_table [handle_].valid = false;

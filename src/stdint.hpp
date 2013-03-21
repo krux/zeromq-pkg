@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -27,7 +27,7 @@
 
 #include <inttypes.h>
 
-#elif defined _MSC_VER && _MSC_VER < 1600
+#elif defined _MSC_VER
 
 #ifndef int8_t
 typedef __int8 int8_t;

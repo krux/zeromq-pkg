@@ -1,5 +1,4 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
     Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
@@ -22,56 +21,110 @@
 #ifndef __ZMQ_TEST_TESTUTIL_HPP_INCLUDED__
 #define __ZMQ_TEST_TESTUTIL_HPP_INCLUDED__
 
-#include "../include/zmq.h"
-#include <string.h>
-
-#undef NDEBUG
 #include <assert.h>
+#include <iostream>
+#include <string>
+#include <utility>
 
-inline void bounce (void *sb, void *sc)
+#include "../include/zmq.hpp"
+
+namespace zmqtestutil
 {
-    const char *content = "12345678ABCDEFGH12345678abcdefgh";
 
-    //  Send the message.
-    int rc = zmq_send (sc, content, 32, ZMQ_SNDMORE);
-    assert (rc == 32);
-    rc = zmq_send (sc, content, 32, 0);
-    assert (rc == 32);
+    using namespace std ;
 
-    //  Bounce the message back.
-    char buf1 [32];
-    rc = zmq_recv (sb, buf1, 32, 0);
-    assert (rc == 32);
-    int rcvmore;
-    size_t sz = sizeof (rcvmore);
-    rc = zmq_getsockopt (sb, ZMQ_RCVMORE, &rcvmore, &sz);
-    assert (rc == 0);
-    assert (rcvmore);
-    rc = zmq_recv (sb, buf1, 32, 0);
-    assert (rc == 32);
-    rc = zmq_getsockopt (sb, ZMQ_RCVMORE, &rcvmore, &sz);
-    assert (rc == 0);
-    assert (!rcvmore);
-    rc = zmq_send (sb, buf1, 32, ZMQ_SNDMORE);
-    assert (rc == 32);
-    rc = zmq_send (sb, buf1, 32, 0);
-    assert (rc == 32);
+    typedef std::pair <zmq::socket_t*, zmq::socket_t*> socket_pair;
 
-    //  Receive the bounced message.
-    char buf2 [32];
-    rc = zmq_recv (sc, buf2, 32, 0);
-    assert (rc == 32);
-    rc = zmq_getsockopt (sc, ZMQ_RCVMORE, &rcvmore, &sz);
-    assert (rc == 0);
-    assert (rcvmore);
-    rc = zmq_recv (sc, buf2, 32, 0);
-    assert (rc == 32);
-    rc = zmq_getsockopt (sc, ZMQ_RCVMORE, &rcvmore, &sz);
-    assert (rc == 0);
-    assert (!rcvmore);
+    //  Create a pair of sockets connected to each other.
+    socket_pair create_bound_pair (zmq::context_t *context_,
+        int t1_, int t2_, const char *transport_)
+    {
+        zmq::socket_t *s1 = new zmq::socket_t (*context_, t1_);
+        zmq::socket_t *s2 = new zmq::socket_t (*context_, t2_);
+        s1->bind (transport_);
+        s2->connect (transport_);
+        return socket_pair (s1, s2);
+    }
 
-    //  Check whether the message is still the same.
-    assert (memcmp (buf2, content, 32) == 0);
+    //  Send a message from one socket in the pair to the other and back.
+    std::string ping_pong (const socket_pair &sp_, const std::string &orig_msg_)
+    {
+        zmq::socket_t &s1 = *sp_.first;
+        zmq::socket_t &s2 = *sp_.second;
+
+        //  Construct message to send.
+        zmq::message_t ping (orig_msg_.size ());
+        memcpy (ping.data (), orig_msg_.c_str (), orig_msg_.size ());
+
+        //  Send ping out.
+        s1.send (ping, 0);
+
+        //  Get pong from connected socket.
+        zmq::message_t pong;
+        s2.recv (&pong, 0);
+
+        //  Send message via s2, so state is clean in case of req/rep.
+        std::string ret ((char*) pong.data(), pong.size ());
+        s2.send (pong, 0);
+
+        //  Return received data as std::string.
+        return ret ;
+    }
+
+    /*  Run basic tests for the given transport.
+
+        Basic tests are:
+        * ping pong as defined above.
+        * send receive where the receive is signalled by zmq::poll
+    */
+    void basic_tests (const char *transport_, int t1_, int t2_)
+    {
+        zmq::context_t context (1);
+
+        zmq::pollitem_t items [2];
+        socket_pair p = create_bound_pair (&context, t1_, t2_, transport_);
+
+        //  First test simple ping pong.
+        const string expect ("XXX");
+
+        {
+            const string returned = zmqtestutil::ping_pong (p, expect);
+            assert (expect == returned);
+
+            //  Adjust socket state so that poll shows only 1 pending message.
+            zmq::message_t mx ;
+            p.first->recv (&mx, 0);
+        }
+
+        {
+            //  Now poll is used to singal that a message is ready to read.
+            zmq::message_t m1 (expect.size ());
+            memcpy (m1.data (), expect.c_str (), expect.size ());
+            items [0].socket = *p.first;
+            items [0].fd = 0;
+            items [0].events = ZMQ_POLLIN;
+            items [0].revents = 0;
+            items [1].socket = *p.second;
+            items [1].fd = 0;
+            items [1].events = ZMQ_POLLIN;
+            items [1].revents = 0;
+
+            p.first->send (m1, 0);
+
+            int rc = zmq::poll (&items [0], 2, -1);
+            assert (rc == 1);
+            assert ((items [1].revents & ZMQ_POLLIN) != 0);
+
+            zmq::message_t m2;
+            p.second->recv (&m2, 0);
+            const string ret ((char*) m2.data (), m2.size ());
+            assert (expect == ret);
+        }
+
+        //  Delete sockets.
+        delete (p.first);
+        delete (p.second);
+    }
 }
 
 #endif

@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2009-2011 250bpm s.r.o.
-    Copyright (c) 2007-2009 iMatix Corporation
+    Copyright (c) 2007-2011 iMatix Corporation
     Copyright (c) 2007-2011 Other contributors as noted in the AUTHORS file
 
     This file is part of 0MQ.
@@ -22,31 +21,23 @@
 #ifndef __ZMQ_ENCODER_HPP_INCLUDED__
 #define __ZMQ_ENCODER_HPP_INCLUDED__
 
-#if defined(_MSC_VER)
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#endif
-
 #include <stddef.h>
 #include <string.h>
 #include <stdlib.h>
 #include <algorithm>
 
 #include "err.hpp"
-#include "msg.hpp"
-#include "i_encoder.hpp"
+
+#include "../include/zmq.h"
 
 namespace zmq
 {
-
-    class i_msg_source;
 
     //  Helper base class for encoders. It implements the state machine that
     //  fills the outgoing buffer. Derived classes should implement individual
     //  state machine actions.
 
-    template <typename T> class encoder_base_t : public i_encoder
+    template <typename T> class encoder_base_t
     {
     public:
 
@@ -76,24 +67,29 @@ namespace zmq
             unsigned char *buffer = !*data_ ? buf : *data_;
             size_t buffersize = !*data_ ? bufsize : *size_;
 
+            size_t pos = 0;
             if (offset_)
                 *offset_ = -1;
 
-            size_t pos = 0;
-            while (pos < buffersize) {
+            while (true) {
 
                 //  If there are no more data to return, run the state machine.
                 //  If there are still no data, return what we already have
                 //  in the buffer.
                 if (!to_write) {
-                    //  If we are to encode the beginning of a new message,
-                    //  adjust the message offset.
-                    if (beginning)
-                        if (offset_ && *offset_ == -1)
-                            *offset_ = static_cast <int> (pos);
+                    if (!(static_cast <T*> (this)->*next) ()) {
+                        *data_ = buffer;
+                        *size_ = pos;
+                        return;
+                    }
 
-                    if (!(static_cast <T*> (this)->*next) ())
-                        break;
+                    //  If beginning of the message was processed, adjust the
+                    //  first-message-offset.
+                    if (beginning) { 
+                        if (offset_ && *offset_ == -1)
+                            *offset_ = pos;
+                        beginning = false;
+                    }
                 }
 
                 //  If there are no data in the buffer yet and we are able to
@@ -120,10 +116,12 @@ namespace zmq
                 pos += to_copy;
                 write_pos += to_copy;
                 to_write -= to_copy;
+                if (pos == buffersize) {
+                    *data_ = buffer;
+                    *size_ = pos;
+                    return;
+                }
             }
-
-            *data_ = buffer;
-            *size_ = pos;
         }
 
     protected:
@@ -145,20 +143,11 @@ namespace zmq
 
     private:
 
-        //  Where to get the data to write from.
         unsigned char *write_pos;
-
-        //  How much data to write before next step should be executed.
         size_t to_write;
-
-        //  Next step. If set to NULL, it means that associated data stream
-        //  is dead.
         step_t next;
-
-        //  If true, first byte of the message is being written.
         bool beginning;
 
-        //  The buffer for encoded data.
         size_t bufsize;
         unsigned char *buf;
 
@@ -175,15 +164,15 @@ namespace zmq
         encoder_t (size_t bufsize_);
         ~encoder_t ();
 
-        void set_msg_source (i_msg_source *msg_source_);
+        void set_inout (struct i_inout *source_);
 
     private:
 
         bool size_ready ();
         bool message_ready ();
 
-        i_msg_source *msg_source;
-        msg_t in_progress;
+        struct i_inout *source;
+        ::zmq_msg_t in_progress;
         unsigned char tmpbuf [10];
 
         encoder_t (const encoder_t&);
