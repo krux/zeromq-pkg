@@ -6,7 +6,7 @@ Build-Depends: debhelper (>= 7), uuid-dev, pkg-config
 Standards-Version: 3.9.2
 Homepage: http://www.zeromq.org/
 
-Package: libzmq1
+Package: libzmq0
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: ZeroMQ lightweight messaging kernel (shared library)
@@ -22,7 +22,7 @@ Description: ZeroMQ lightweight messaging kernel (shared library)
 Package: libzmq-dev
 Architecture: any
 Section: libdevel
-Depends: libzmq1 (= ${binary:Version}), ${misc:Depends}
+Depends: libzmq0 (= ${binary:Version}), ${misc:Depends}
 Description: ZeroMQ lightweight messaging kernel (development libraries and header files)
  The 0MQ lightweight messaging kernel is a library which extends the
  standard socket interfaces with features traditionally provided by
@@ -38,7 +38,7 @@ Package: libzmq-dbg
 Architecture: any
 Priority: extra
 Section: debug
-Depends: libzmq1 (= ${binary:Version}), ${misc:Depends}
+Depends: libzmq0 (= ${binary:Version}), ${misc:Depends}
 Description: ZeroMQ lightweight messaging kernel (debugging symbols)
  The 0MQ lightweight messaging kernel is a library which extends the
  standard socket interfaces with features traditionally provided by
